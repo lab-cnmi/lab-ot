@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="theme-color" content="#f5f7fa" />
+  <title>LAB OT — LAB / Molec / Bacteria</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div id="toast" class="toast" hidden></div>
+
+  <main id="setupView" class="center-shell" hidden>
+    <section class="auth-card">
+      <div class="brand-mark">OT</div>
+      <h1>LAB OT</h1>
+      <p>ระบบยังไม่ได้ตั้งค่า Supabase กรุณาแจ้ง Admin</p>
+      <button id="offlineDemoBtn" class="secondary-btn">ทดลองอ่าน Excel แบบไม่บันทึก</button>
+    </section>
+  </main>
+
+  <main id="authView" class="center-shell" hidden>
+    <section class="auth-card">
+      <div class="brand-mark">OT</div>
+      <h1>LAB OT</h1>
+      <p class="subtle">รวม OT ของ LAB, Molec และ Bacteria รอบ 16–15</p>
+      <form id="loginForm" class="stack">
+        <label>อีเมล
+          <input id="emailInput" type="email" autocomplete="username" placeholder="name@mahidol.ac.th" required />
+        </label>
+        <label>รหัสผ่าน
+          <input id="passwordInput" type="password" autocomplete="current-password" required />
+        </label>
+        <button class="primary-btn" type="submit">เข้าสู่ระบบ</button>
+      </form>
+      <p id="loginError" class="error-text" hidden></p>
+    </section>
+  </main>
+
+  <div id="appView" hidden>
+    <header class="topbar">
+      <div>
+        <div class="eyebrow">LAB OT · LAB / MOLEC / BACTERIA</div>
+        <h1>สรุป OT รอบ 16–15</h1>
+      </div>
+      <div class="topbar-actions">
+        <span id="loginBadge" class="user-badge"></span>
+        <button id="logoutBtn" class="ghost-btn">ออกจากระบบ</button>
+      </div>
+    </header>
+
+    <nav class="tabs" aria-label="เมนูหลัก">
+      <button class="tab active" data-tab="work">ทำ OT รอบนี้</button>
+      <button class="tab" data-tab="history">รอบที่บันทึกไว้</button>
+      <button class="tab" data-tab="guide">วิธีใช้ทุกเดือน</button>
+    </nav>
+
+    <main class="page-shell">
+      <section id="tab-work" class="tab-panel active">
+        <section class="cycle-card">
+          <div>
+            <div class="section-kicker">รอบ HR</div>
+            <h2 id="cycleTitle">-</h2>
+            <p>เลือกรอบครั้งเดียว แล้วระบบใช้รอบเดียวกันกับไฟล์ทั้ง 3 หน่วย</p>
+          </div>
+          <div class="cycle-controls">
+            <label>เดือนเริ่มรอบ
+              <select id="cycleMonth"></select>
+            </label>
+            <label>ปี พ.ศ.
+              <input id="cycleYear" type="number" min="2560" max="2600" step="1" />
+            </label>
+            <button id="currentCycleBtn" class="secondary-btn compact">รอบปัจจุบัน</button>
+          </div>
+        </section>
+
+        <div class="notice-card">
+          <b>ระบบคิดต่างกันตามหน่วย</b>
+          <span><b>LAB/Molec</b> วันธรรมดา 16 ชม. · เสาร์/อาทิตย์หรือวันที่มี * = 24 ชม. &nbsp;•&nbsp; <b>Bacteria</b> คิดตามช่องเวลาจริง H1/H2/H3 = 8 ชม., Extra = 4 ชม., บ่าย = 8 ชม., ดึก = 8 ชม.</span>
+        </div>
+
+        <section class="card">
+          <div class="section-head">
+            <div><h2>1. อัปตารางเวรให้ครบ 3 หน่วย</h2><p>ระบบจะไม่ให้ยืนยันรอบจนกว่าจะมี LAB + Molec + Bacteria ครบ</p></div>
+            <span id="unitReadyBadge" class="pill">0 / 3 หน่วย</span>
+          </div>
+          <div class="unit-upload-grid">
+            <article class="unit-upload">
+              <div class="unit-head"><span class="unit-dot lab"></span><b>LAB</b></div>
+              <p>ตารางแบบ เวร A–D</p>
+              <input id="labFile" type="file" accept=".xlsx,.xls" />
+              <div id="labStatus" class="file-status">ยังไม่ได้เลือกไฟล์</div>
+            </article>
+            <article class="unit-upload">
+              <div class="unit-head"><span class="unit-dot molec"></span><b>Molec</b></div>
+              <p>ตารางแบบเดียวกับ LAB</p>
+              <input id="molecFile" type="file" accept=".xlsx,.xls" />
+              <div id="molecStatus" class="file-status">ยังไม่ได้เลือกไฟล์</div>
+            </article>
+            <article class="unit-upload">
+              <div class="unit-head"><span class="unit-dot bact"></span><b>Bacteria</b></div>
+              <p>H1/H2/H3 · Extra · บ่าย · ดึก</p>
+              <input id="bacteriaFile" type="file" accept=".xlsx,.xls" />
+              <div id="bacteriaStatus" class="file-status">ยังไม่ได้เลือกไฟล์</div>
+            </article>
+          </div>
+        </section>
+
+        <section class="card sync-card">
+          <div class="step-no">2</div>
+          <div class="sync-copy">
+            <h2>ดึงวันลาล่าสุดจาก Google Calendar</h2>
+            <p>Staff ไม่ต้อง Export Calendar เอง ระบบดึงจาก 2 Calendar ที่ Admin เชื่อมไว้หลังบ้าน</p>
+            <div id="calendarStatus" class="file-status">อัปตารางเวรให้ครบ 3 หน่วยก่อน</div>
+            <div id="calendarSyncMeta" class="sync-meta" hidden></div>
+          </div>
+          <button id="syncCalendarBtn" class="secondary-btn" disabled>ดึงวันลาล่าสุด</button>
+        </section>
+
+        <section id="resultArea" hidden>
+          <div class="summary-grid five">
+            <div class="metric"><span>รอบ OT</span><b id="cycleMetric">-</b></div>
+            <div class="metric"><span>จำนวนคน</span><b id="staffMetric">0</b></div>
+            <div class="metric"><span>รายการเวร</span><b id="assignmentMetric">0</b></div>
+            <div class="metric"><span>OT รวม</span><b id="hoursMetric">0 ชม.</b></div>
+            <div class="metric warn"><span>เตือนวันลา</span><b id="conflictMetric">0</b></div>
+          </div>
+
+          <section class="card">
+            <div class="section-head"><div><h2>ตรวจไฟล์ก่อนบันทึก</h2><p>คำเตือนจะไม่แก้หรือตัด OT ให้อัตโนมัติ</p></div></div>
+            <div id="validationList" class="validation-list"></div>
+          </section>
+
+          <section class="card">
+            <div class="section-head">
+              <div><h2>สรุปรวมรายคน</h2><p>รวมคนชื่อเดียวกันจากทุกหน่วยเป็นยอดเดียว และยังแยกดูยอดรายหน่วยได้</p></div>
+              <div class="actions">
+                <button id="exportBtn" class="secondary-btn" disabled>Export Excel</button>
+                <button id="saveBtn" class="primary-btn" disabled>ยืนยันและบันทึกรอบนี้</button>
+              </div>
+            </div>
+            <div class="table-wrap"><table id="summaryTable"></table></div>
+          </section>
+
+          <section class="card">
+            <div class="section-head"><div><h2>สรุปตามหน่วย</h2><p>ใช้ตรวจยอด LAB / Molec / Bacteria ก่อนส่ง</p></div></div>
+            <div class="table-wrap"><table id="unitSummaryTable"></table></div>
+          </section>
+
+          <section class="card">
+            <div class="section-head"><div><h2>รายการวันลาที่ชนกับเวร</h2><p>ระบบใช้ Calendar เป็นตัวเตือนเท่านั้น ไม่หัก OT เอง</p></div></div>
+            <div id="conflictEmpty" class="empty-state">ยังไม่ได้ดึง Calendar</div>
+            <div class="table-wrap"><table id="conflictTable"></table></div>
+          </section>
+        </section>
+      </section>
+
+      <section id="tab-history" class="tab-panel">
+        <section class="card">
+          <div class="section-head"><div><h2>รอบที่บันทึกไว้</h2><p>เปิดรอบเดิมจะใช้ Snapshot ณ เวลาที่กดยืนยัน ไม่ Sync Calendar ใหม่เอง</p></div><button id="refreshHistoryBtn" class="secondary-btn">รีเฟรช</button></div>
+          <div id="historyList" class="history-list"></div>
+        </section>
+      </section>
+
+      <section id="tab-guide" class="tab-panel">
+        <section class="guide-card">
+          <h2>วิธีทำทุกเดือน</h2>
+          <ol class="guide-steps">
+            <li><b>เลือกรอบ OT</b><span>เช่น 16 ส.ค. 2569 – 15 ก.ย. 2569 ระบบใช้รอบนี้กับทั้ง 3 หน่วย</span></li>
+            <li><b>อัป LAB + Molec + Bacteria</b><span>ต้องครบ 3 ไฟล์ ระบบจึงเปิดให้ดึง Calendar และยืนยันรอบ</span></li>
+            <li><b>กด “ดึงวันลาล่าสุด”</b><span>ระบบไปอ่าน Calendar สดที่ Admin เชื่อมไว้ ไม่ต้องดาวน์โหลด .ics เอง</span></li>
+            <li><b>ตรวจคำเตือน</b><span>ถ้าชื่อเดียวกันมีเวรและมีรายการใน Calendar วันเดียวกัน ให้ตรวจว่ามีเปลี่ยนเวร/มาทำจริงหรือไม่</span></li>
+            <li><b>กดยืนยัน</b><span>ระบบเก็บ Snapshot ของ Excel ทั้ง 3 หน่วย + Calendar ณ เวลานั้นไว้</span></li>
+            <li><b>Export Excel</b><span>ได้สรุปรวมรายคน, แยกหน่วย, รายละเอียดเวร, รายการเตือน และรายการ Calendar</span></li>
+          </ol>
+          <div class="tip-box"><b>ถ้าหัวเดือนใน Excel ผิด</b><span>ระบบใช้ “รอบที่เลือกในหน้าเว็บ” เป็นหลัก และจะแจ้งเตือนว่าหัวไฟล์ไม่ตรง แต่ไม่ทำให้วันที่เลื่อนไปผิดเดือน</span></div>
+          <div class="tip-box"><b>Bacteria — เวรดึก</b><span>ช่อง “ดึก 00:00–08:00” นับเป็นวันถัดไป เช่น แถววันที่ 15 ส.ค. ช่องดึก = OT วันที่ 16 ส.ค. จึงเข้ารอบ 16 ส.ค.–15 ก.ย.</span></div>
+          <div class="tip-box"><b>สิทธิ์ Staff</b><span>Staff ทำงาน OT ในหน้าเว็บได้ครบ แต่ไม่มีเมนูตั้งค่า GitHub, Supabase, SQL หรือ Secret Calendar URL</span></div>
+        </section>
+      </section>
+    </main>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
