@@ -925,32 +925,10 @@
   /* ===========================
      USER MANAGEMENT — ADMIN
      =========================== */
-  function managerDirectory() {
-    return Object.entries(HR_STAFF_MASTER)
-      .map(([nick,info])=>({
-        nick,
-        fullName:info.fullName,
-        employeeCode:String(info.employeeCode||'').replace(/\D/g,'').padStart(7,'0'),
-        staffKey:`emp:${String(info.employeeCode||'').replace(/\D/g,'').padStart(7,'0')}`
-      }))
-      .sort((a,b)=>a.fullName.localeCompare(b.fullName,'th'));
+  function normalizeEmployeeCode(value) {
+    return String(value||'').replace(/\D/g,'');
   }
 
-  function populateUserStaffSelect() {
-    const sel=$('newUserStaff');
-    if(!sel) return;
-    const rows=managerDirectory();
-    sel.innerHTML='<option value="">เลือกเจ้าหน้าที่</option>'+rows.map(x=>
-      `<option value="${esc(x.staffKey)}" data-name="${esc(x.fullName)}" data-employee="${esc(x.employeeCode)}">${esc(x.fullName)} (${esc(x.employeeCode)})</option>`
-    ).join('');
-  }
-
-  function syncNewUserEmployeeCode() {
-    const sel=$('newUserStaff');
-    const option=sel?.selectedOptions?.[0];
-    const code=String(option?.dataset?.employee||'');
-    if($('newUserEmployeeCode')) $('newUserEmployeeCode').value=code;
-  }
 
   async function invokeAdminUsers(action,payload={}) {
     const {data,error}=await state.sb.functions.invoke('admin-users',{body:{action,...payload}});
@@ -1023,18 +1001,26 @@
   async function createManagedUser(e) {
     e.preventDefault();
     if(state.actualRole!=='admin') return toast('ใช้ได้เฉพาะ Admin');
-    const sel=$('newUserStaff');
-    const option=sel?.selectedOptions?.[0];
-    const staffKey=String(sel?.value||'');
-    const displayName=String(option?.dataset?.name||'');
-    const employeeCode=String(option?.dataset?.employee||'');
+
+    const displayName=String($('newUserDisplayName')?.value||'').trim();
+    const employeeCode=normalizeEmployeeCode($('newUserEmployeeCode')?.value);
+    const staffKey=employeeCode ? `emp:${employeeCode}` : '';
     const username=String($('newUserUsername')?.value||'').trim().toLowerCase().replace(/@mahidol\.ac\.th$/i,'');
     const position=String($('newUserPosition')?.value||'').trim();
     const password=String($('newUserPassword')?.value||'');
     const err=$('newUserError');
+
     if(err){err.hidden=true;err.textContent='';}
     const fail=msg=>{if(err){err.textContent=msg;err.hidden=false;}};
-    if(!staffKey) return fail('กรุณาเลือกเจ้าหน้าที่');
+
+    if(!displayName) return fail('กรุณาระบุชื่อ-สกุล');
+    if(!/^\d{7}$/.test(employeeCode)) return fail('รหัสพนักงานต้องเป็นตัวเลข 7 หลัก');
+
+    const duplicateCode=(state.managedUsers||[]).find(
+      u=>String(u.employeeCode||'')===employeeCode
+    );
+    if(duplicateCode) return fail(`รหัสพนักงาน ${employeeCode} มีบัญชีอยู่แล้ว`);
+
     if(!/^[a-z0-9._-]+$/.test(username)) return fail('Mahidol ID ไม่ถูกต้อง');
     if(password.length<8) return fail('รหัสผ่านชั่วคราวต้องมีอย่างน้อย 8 ตัวอักษร');
 
@@ -1049,9 +1035,7 @@
       $('newUserForm')?.reset();
       if($('newUserActive')) $('newUserActive').checked=true;
       if($('newUserRole')) $('newUserRole').value='staff';
-      populateUserStaffSelect();
-      syncNewUserEmployeeCode();
-      toast('สร้างบัญชีแล้ว');
+        toast('สร้างบัญชีแล้ว');
       await Promise.all([loadManagedUsers(),loadAckManagerData()]);
     }catch(ex){
       console.error('create user',ex);
@@ -1185,7 +1169,9 @@
     $('saveAckEmailsBtn')?.addEventListener('click', saveAckMappings);
     $('exportAckEvidenceBtn')?.addEventListener('click', exportAckEvidence);
     $('refreshAckBtn')?.addEventListener('click', loadAckManagerData);
-    $('newUserStaff')?.addEventListener('change', syncNewUserEmployeeCode);
+    $('newUserEmployeeCode')?.addEventListener('input',e=>{
+      e.target.value=String(e.target.value||'').replace(/\D/g,'').slice(0,7);
+    });
     $('newUserForm')?.addEventListener('submit', createManagedUser);
     $('reloadManagedUsersBtn')?.addEventListener('click', loadManagedUsers);
     $('managedUsersTable')?.addEventListener('click', e=>{
