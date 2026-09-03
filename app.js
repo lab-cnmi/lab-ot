@@ -54,7 +54,16 @@
     managerOwnAckRows: [],
     staffOwnAckRows: [],
     adminAckCycleKey: '',
-    staffAckCycleKey: ''
+    staffAckCycleKey: '',
+    resultTab: 'summary',
+    summaryRows: [],
+    summarySearch: '',
+    summaryPage: 1,
+    ackSearch: '',
+    ackPage: 1,
+    conflictPage: 1,
+    leavePage: 1,
+    ackEmailDrafts: {}
   };
 
   const $ = id => document.getElementById(id);
@@ -136,6 +145,7 @@
     updateCycleTitle();
     if (old && old !== state.cycle.start) {
       state.calendarSources = []; state.leaveEvents = []; state.calendarSyncedAt = null; state.snapshotAt = null; state.loadedSnapshot = false; state.hrExport = null;
+      state.summaryPage=1; state.ackPage=1; state.conflictPage=1; state.leavePage=1; state.ackEmailDrafts={};
       for (const unit of UNITS) {
         const raw = state.rawFiles[unit];
         if (raw) {
@@ -1123,6 +1133,39 @@
     document.querySelectorAll('.staff-tab').forEach(btn=>btn.addEventListener('click',()=>switchStaffTab(btn.dataset.staffTab)));
     $('refreshAdminLogBtn')?.addEventListener('click',()=>loadAppLogs('admin'));
     $('refreshStaffLogBtn')?.addEventListener('click',()=>loadAppLogs('staff'));
+    document.querySelectorAll('.result-tab').forEach(btn=>btn.addEventListener('click',()=>switchResultTab(btn.dataset.resultTab)));
+    $('resultArea')?.addEventListener('click',e=>{
+      const btn=e.target.closest('[data-result-page]');
+      if(btn && !btn.disabled) changeResultPage(btn.dataset.resultPage,Number(btn.dataset.page||1));
+    });
+    $('summarySearchInput')?.addEventListener('input',e=>{
+      state.summarySearch=e.target.value;
+      state.summaryPage=1;
+      renderSummary(state.summaryRows);
+    });
+    $('clearSummarySearchBtn')?.addEventListener('click',()=>{
+      state.summarySearch='';
+      state.summaryPage=1;
+      if($('summarySearchInput')) $('summarySearchInput').value='';
+      renderSummary(state.summaryRows);
+    });
+    $('ackSearchInput')?.addEventListener('input',e=>{
+      captureAckDrafts();
+      state.ackSearch=e.target.value;
+      state.ackPage=1;
+      renderAckManager();
+    });
+    $('clearAckSearchBtn')?.addEventListener('click',()=>{
+      captureAckDrafts();
+      state.ackSearch='';
+      state.ackPage=1;
+      if($('ackSearchInput')) $('ackSearchInput').value='';
+      renderAckManager();
+    });
+    $('ackManagerTable')?.addEventListener('input',e=>{
+      const input=e.target.closest('[data-ack-email]');
+      if(input) state.ackEmailDrafts[input.dataset.ackEmail]=input.value;
+    });
     $('ackLogoutBtn')?.addEventListener('click', logout);
     $('ackChangePasswordBtn')?.addEventListener('click', openPasswordModal);
     $('saveAckEmailsBtn')?.addEventListener('click', saveAckMappings);
@@ -1268,6 +1311,7 @@
       const parsed = parseUnit(unit, buffer, file.name);
       state.units[unit] = parsed;
       state.calendarSources = []; state.leaveEvents = []; state.calendarSyncedAt = null; state.snapshotAt = null; state.loadedSnapshot = false; state.hrExport = null;
+      state.summaryPage=1; state.ackPage=1; state.conflictPage=1; state.leavePage=1; state.ackEmailDrafts={};
       const warnCount = parsed.validation.filter(x => x.type === 'warn').length;
       setUnitStatus(unit, `✓ ${file.name} · ${parsed.assignments.length} รายการ · ${parsed.totalHours} ชม.${warnCount ? ` · มี ${warnCount} จุดให้ตรวจ` : ''}`, warnCount ? 'warn' : 'ok');
       $('calendarSyncMeta').hidden = true;
@@ -1449,6 +1493,53 @@
     return out.sort((a,b)=>a.date.localeCompare(b.date)||a.name.localeCompare(b.name,'th')||a.unit.localeCompare(b.unit));
   }
 
+
+  const RESULT_PAGE_SIZE = 10;
+
+  function switchResultTab(name) {
+    state.resultTab=name||'summary';
+    document.querySelectorAll('.result-tab').forEach(btn=>{
+      const active=btn.dataset.resultTab===state.resultTab;
+      btn.classList.toggle('active',active);
+      btn.setAttribute('aria-selected',active?'true':'false');
+    });
+    document.querySelectorAll('.result-panel').forEach(panel=>{
+      panel.classList.toggle('active',panel.id===`result-panel-${state.resultTab}`);
+    });
+    if(state.resultTab==='ack') renderAckManager();
+    if(state.resultTab==='leave'){ renderConflicts(); renderAllLeaves(); }
+    if(state.resultTab==='validation') renderValidation();
+  }
+
+  function pageSlice(rows,page,size=RESULT_PAGE_SIZE){
+    const total=Math.max(0,rows.length);
+    const pages=Math.max(1,Math.ceil(total/size));
+    const safe=Math.min(Math.max(1,Number(page)||1),pages);
+    return {page:safe,pages,total,rows:rows.slice((safe-1)*size,safe*size)};
+  }
+
+  function renderPager(id,kind,page,pages,total){
+    const el=$(id);
+    if(!el) return;
+    if(total<=RESULT_PAGE_SIZE){el.innerHTML='';return;}
+    el.innerHTML=`<button class="secondary-btn compact" type="button" data-result-page="${esc(kind)}" data-page="${page-1}" ${page<=1?'disabled':''}>ก่อนหน้า</button>
+      <span>หน้า ${page} / ${pages} · ${total} รายการ</span>
+      <button class="secondary-btn compact" type="button" data-result-page="${esc(kind)}" data-page="${page+1}" ${page>=pages?'disabled':''}>ถัดไป</button>`;
+  }
+
+  function changeResultPage(kind,page){
+    if(kind==='summary'){state.summaryPage=page;renderSummary(state.summaryRows);}
+    if(kind==='ack'){captureAckDrafts();state.ackPage=page;renderAckManager();}
+    if(kind==='conflict'){state.conflictPage=page;renderConflicts();}
+    if(kind==='leave'){state.leavePage=page;renderAllLeaves();}
+  }
+
+  function captureAckDrafts(){
+    document.querySelectorAll('[data-ack-email]').forEach(input=>{
+      state.ackEmailDrafts[input.dataset.ackEmail]=input.value;
+    });
+  }
+
   function recompute() {
     updateCycleTitle();
     const ready = UNITS.filter(u => !!state.units[u]).length;
@@ -1467,11 +1558,13 @@
     $('resultArea').hidden = assignments.length === 0;
     if (!assignments.length) return;
     const summary = buildSummary(assignments), unitSummary = buildUnitSummary(assignments);
+    state.summaryRows=summary;
     state.conflicts = computeConflicts(assignments, state.leaveEvents);
     $('staffMetric').textContent = summary.length.toLocaleString('th-TH');
     $('assignmentMetric').textContent = assignments.length.toLocaleString('th-TH');
     $('hoursMetric').textContent = `${assignments.reduce((s,x)=>s+x.hours,0).toLocaleString('th-TH')} ชม.`;
     $('conflictMetric').textContent = state.conflicts.length.toLocaleString('th-TH');
+    if($('resultLeaveBadge')) $('resultLeaveBadge').textContent=String(state.conflicts.length);
     renderValidation(); renderSummary(summary); renderUnitSummary(unitSummary); renderConflicts(); renderAllLeaves(); renderSpecial328Eligibility(); renderAckManager();
     $('exportBtn').disabled = !unitsReady();
     $('saveBtn').disabled = state.offline || !unitsReady() || !state.calendarSyncedAt;
@@ -1484,11 +1577,29 @@
     else items.unshift({type:'warn',text:'ต้องอัป LAB + Molec + Bacteria ให้ครบก่อนยืนยันรอบ'});
     if (state.calendarSyncedAt) items.push({type:'ok',text:`วันลาที่ดึงล่าสุด ${fmtDateTimeThai(state.calendarSyncedAt)} · ${state.leaveEvents.length} รายการในช่วงรอบ`});
     else items.push({type:'warn',text:'ยังไม่ได้ดึงวันลาล่าสุด'});
+
+    const warnings=items.filter(x=>x.type!=='ok').length;
+    const assignments=allAssignments();
+    const quick=[];
+    quick.push(`<span class="quick-chip ${unitsReady()?'ok':'warn'}">${unitsReady()?'✓ ไฟล์ครบ 3 หน่วย':'ไฟล์ยังไม่ครบ'}</span>`);
+    if(assignments.length) quick.push(`<span class="quick-chip ok">✓ อ่าน ${assignments.length.toLocaleString('th-TH')} รายการ</span>`);
+    quick.push(`<span class="quick-chip ${state.calendarSyncedAt?'ok':'warn'}">${state.calendarSyncedAt?`✓ วันลา ${state.leaveEvents.length.toLocaleString('th-TH')} รายการ`:'ยังไม่ได้ดึงวันลา'}</span>`);
+    quick.push(`<span class="quick-chip ${warnings?'warn':'ok'}">${warnings?`มี ${warnings} จุดให้ตรวจ`:'✓ ไม่พบคำเตือน'}</span>`);
+
+    if($('validationQuick')) $('validationQuick').innerHTML=quick.join('');
     $('validationList').innerHTML = items.map(x=>`<div class="validation-item ${x.type}">${esc(x.text)}</div>`).join('');
   }
 
   function renderSummary(rows) {
-    $('summaryTable').innerHTML = `<thead><tr><th>ชื่อ</th><th class="num">LAB</th><th class="num">Molec</th><th class="num">Bacteria</th><th class="num">รวมชั่วโมง</th><th class="num">ช่วง 8 ชม.</th><th class="num">รายการเวร</th></tr></thead><tbody>${rows.map(r=>`<tr><td><b>${esc(r.name)}</b></td><td class="num">${r.LAB||'-'}</td><td class="num">${r.Molec||'-'}</td><td class="num">${r.Bacteria||'-'}</td><td class="num"><b>${r.hours}</b></td><td class="num">${round1(r.hours/8)}</td><td class="num">${r.count}</td></tr>`).join('')}</tbody>`;
+    state.summaryRows=rows||state.summaryRows||[];
+    const q=normSearch(state.summarySearch||'');
+    const filtered=q ? state.summaryRows.filter(r=>normSearch(r.name).includes(q)) : state.summaryRows;
+    const pg=pageSlice(filtered,state.summaryPage);
+    state.summaryPage=pg.page;
+
+    if($('summaryResultMeta')) $('summaryResultMeta').textContent=`แสดง ${pg.rows.length} จาก ${pg.total} คน`;
+    $('summaryTable').innerHTML = `<thead><tr><th>ชื่อ</th><th class="num">LAB</th><th class="num">Molec</th><th class="num">Bacteria</th><th class="num">รวมชั่วโมง</th><th class="num">ช่วง 8 ชม.</th><th class="num">รายการเวร</th></tr></thead><tbody>${pg.rows.map(r=>`<tr><td><b>${esc(r.name)}</b></td><td class="num">${r.LAB||'-'}</td><td class="num">${r.Molec||'-'}</td><td class="num">${r.Bacteria||'-'}</td><td class="num"><b>${r.hours}</b></td><td class="num">${round1(r.hours/8)}</td><td class="num">${r.count}</td></tr>`).join('')}</tbody>`;
+    renderPager('summaryPager','summary',pg.page,pg.pages,pg.total);
   }
 
   function renderUnitSummary(rows) {
@@ -1497,13 +1608,16 @@
 
   function renderConflicts() {
     if (!state.calendarSyncedAt) {
-      $('conflictEmpty').textContent='ยังไม่ได้ดึงวันลา'; $('conflictEmpty').hidden=false; $('conflictTable').innerHTML=''; return;
+      $('conflictEmpty').textContent='ยังไม่ได้ดึงวันลา'; $('conflictEmpty').hidden=false; $('conflictTable').innerHTML=''; renderPager('conflictPager','conflict',1,1,0); return;
     }
     if (!state.conflicts.length) {
-      $('conflictEmpty').textContent='ไม่พบเวรที่ตรงกับวันลา'; $('conflictEmpty').hidden=false; $('conflictTable').innerHTML=''; return;
+      $('conflictEmpty').textContent='ไม่พบเวรที่ตรงกับวันลา'; $('conflictEmpty').hidden=false; $('conflictTable').innerHTML=''; renderPager('conflictPager','conflict',1,1,0); return;
     }
     $('conflictEmpty').hidden=true;
-    $('conflictTable').innerHTML=`<thead><tr><th>วันที่ OT</th><th>ชื่อ</th><th>หน่วย</th><th>เวร</th><th>เวลา</th><th class="num">ชม.</th><th>Calendar</th><th>รายการใน Calendar</th></tr></thead><tbody>${state.conflicts.map(x=>`<tr><td>${esc(fmtThaiDate(x.date))}</td><td><b>${esc(x.name)}</b></td><td>${esc(x.unit)}</td><td>${esc(x.duty)}</td><td>${esc(x.timeLabel)}</td><td class="num">${x.hours}</td><td>${esc(x.calendar)}</td><td>${esc(x.summary)}</td></tr>`).join('')}</tbody>`;
+    const pg=pageSlice(state.conflicts,state.conflictPage);
+    state.conflictPage=pg.page;
+    $('conflictTable').innerHTML=`<thead><tr><th>วันที่ OT</th><th>ชื่อ</th><th>หน่วย</th><th>เวร</th><th>เวลา</th><th class="num">ชม.</th><th>Calendar</th><th>รายการใน Calendar</th></tr></thead><tbody>${pg.rows.map(x=>`<tr><td>${esc(fmtThaiDate(x.date))}</td><td><b>${esc(x.name)}</b></td><td>${esc(x.unit)}</td><td>${esc(x.duty)}</td><td>${esc(x.timeLabel)}</td><td class="num">${x.hours}</td><td>${esc(x.calendar)}</td><td>${esc(x.summary)}</td></tr>`).join('')}</tbody>`;
+    renderPager('conflictPager','conflict',pg.page,pg.pages,pg.total);
   }
 
 
@@ -1527,39 +1641,24 @@
       : '';
 
     if (!state.calendarSyncedAt) {
-      empty.hidden=false;
-      empty.textContent='ยังไม่ได้ดึงวันลา';
-      table.innerHTML='';
-      return;
+      empty.hidden=false; empty.textContent='ยังไม่ได้ดึงวันลา'; table.innerHTML=''; renderPager('leavePager','leave',1,1,0); return;
     }
     if (!events.length) {
-      empty.hidden=false;
-      empty.textContent='ไม่พบวันลาในรอบนี้';
-      table.innerHTML='';
-      return;
+      empty.hidden=false; empty.textContent='ไม่พบวันลาในรอบนี้'; table.innerHTML=''; renderPager('leavePager','leave',1,1,0); return;
     }
 
     const conflictCountForEvent=(ev)=>{
       return (state.conflicts||[]).filter(c=>{
         if (ev.uid && c.uid) return c.uid===ev.uid && c.calendar===ev.source;
-        return c.calendar===ev.source &&
-          c.leaveStart===ev.start &&
-          c.leaveEnd===ev.end &&
-          c.summary===ev.summary;
+        return c.calendar===ev.source && c.leaveStart===ev.start && c.leaveEnd===ev.end && c.summary===ev.summary;
       }).length;
     };
-    const leaveRange=(ev)=>{
-      if (ev.start===ev.end) return fmtThaiDate(ev.start);
-      return `${fmtThaiDate(ev.start)} – ${fmtThaiDate(ev.end)}`;
-    };
+    const leaveRange=(ev)=> ev.start===ev.end ? fmtThaiDate(ev.start) : `${fmtThaiDate(ev.start)} – ${fmtThaiDate(ev.end)}`;
 
+    const pg=pageSlice(events,state.leavePage);
+    state.leavePage=pg.page;
     empty.hidden=true;
-    table.innerHTML=`<thead><tr>
-      <th>วันลา</th>
-      <th>รายการ</th>
-      <th>Calendar</th>
-      <th>ตรวจเทียบเวร</th>
-    </tr></thead><tbody>${events.map(ev=>{
+    table.innerHTML=`<thead><tr><th>วันลา</th><th>รายการ</th><th>Calendar</th><th>ตรวจเทียบเวร</th></tr></thead><tbody>${pg.rows.map(ev=>{
       const hits=conflictCountForEvent(ev);
       return `<tr>
         <td><b>${esc(leaveRange(ev))}</b></td>
@@ -1567,10 +1666,10 @@
         <td>${esc(ev.source||'-')}</td>
         <td>${hits
           ? `<span class="leave-match warn">ตรงกับเวร ${hits} รายการ</span>`
-          : `<span class="leave-match ok">ไม่ตรงกับเวร</span>`}
-        </td>
+          : `<span class="leave-match ok">ไม่ตรงกับเวร</span>`}</td>
       </tr>`;
     }).join('')}</tbody>`;
+    renderPager('leavePager','leave',pg.page,pg.pages,pg.total);
   }
 
   async function syncCalendar() {
@@ -1782,6 +1881,7 @@
     const note=$('ackManagerNote');
     if (!card || !table || !badge) return;
 
+    captureAckDrafts();
     const summary=ackManagerSummary();
     card.hidden=!summary.length;
     if (!summary.length) return;
@@ -1789,9 +1889,10 @@
     if (!state.ackDbReady) {
       badge.textContent='ยังไม่พร้อม';
       table.innerHTML='';
-      if(note){note.hidden=false;note.textContent='ต้องติดตั้ง SQL ระบบรับทราบใน Supabase ครั้งเดียวก่อนใช้งานส่วนนี้';}
+      if(note){note.hidden=false;note.textContent='ส่วนรับทราบ OT ยังไม่พร้อมใช้งาน';}
       $('saveAckEmailsBtn').disabled=true;
       $('exportAckEvidenceBtn').disabled=true;
+      if($('resultAckBadge')) $('resultAckBadge').textContent='-';
       return;
     }
 
@@ -1802,18 +1903,28 @@
     const acknowledged=summary.filter(r=>ackMap.get(r.identity.staffKey)?.status==='acknowledged').length;
     badge.textContent=`${acknowledged} / ${summary.length} คน`;
     badge.className=`pill ${acknowledged===summary.length&&summary.length?'good':''}`;
+    if($('resultAckBadge')) $('resultAckBadge').textContent=`${acknowledged}/${summary.length}`;
     $('exportAckEvidenceBtn').disabled=!state.snapshotAt;
+
+    const q=normSearch(state.ackSearch||'');
+    const filtered=q ? summary.filter(r=>normSearch(r.identity.displayName).includes(q)) : summary;
+    const pg=pageSlice(filtered,state.ackPage);
+    state.ackPage=pg.page;
+    if($('ackResultMeta')) $('ackResultMeta').textContent=`แสดง ${pg.rows.length} จาก ${pg.total} คน`;
 
     table.innerHTML=`<thead><tr>
       <th>ชื่อ</th>
       <th class="num">OT</th>
       <th>Mahidol ID</th>
       <th>สถานะ</th>
-    </tr></thead><tbody>${summary.map(r=>{
+    </tr></thead><tbody>${pg.rows.map(r=>{
       const id=r.identity;
       const person=state.ackPeople[id.staffKey]||{};
       const ack=ackMap.get(id.staffKey);
-      const username=String(person.email||'').replace(/@mahidol\.ac\.th$/i,'');
+      const savedUsername=String(person.email||'').replace(/@mahidol\.ac\.th$/i,'');
+      const username=Object.prototype.hasOwnProperty.call(state.ackEmailDrafts,id.staffKey)
+        ? state.ackEmailDrafts[id.staffKey]
+        : savedUsername;
       let status='';
       if(!state.snapshotAt) status='<span class="ack-status neutral">บันทึกรอบก่อน</span>';
       else if(!person.email) status='<span class="ack-status neutral">ยังไม่ได้ใส่ Mahidol ID</span>';
@@ -1833,35 +1944,40 @@
         <td>${status}</td>
       </tr>`;
     }).join('')}</tbody>`;
+    renderPager('ackPager','ack',pg.page,pg.pages,pg.total);
   }
 
   async function saveAckMappings() {
     if (state.offline || !state.sb || !['admin','staff'].includes(state.actualRole)) return;
     if (!state.ackDbReady) return toast('ยังไม่ได้ติดตั้งฐานข้อมูลรับทราบ OT');
 
-    const inputs=[...document.querySelectorAll('[data-ack-email]')];
+    captureAckDrafts();
+    const summary=ackManagerSummary();
     const seen=new Set(), upserts=[], deletes=[];
-    for(const input of inputs){
-      const staffKey=input.dataset.ackEmail;
-      const displayName=input.dataset.ackName||'';
-      const employeeCode=input.dataset.ackEmployee||'';
-      const email=ackEmailValue(input.value);
 
-      if(email && !email.endsWith('@mahidol.ac.th')) return toast(`Mahidol ID ของ ${displayName} ไม่ถูกต้อง`);
+    for(const row of summary){
+      const id=row.identity;
+      const existing=state.ackPeople[id.staffKey]||{};
+      const raw=Object.prototype.hasOwnProperty.call(state.ackEmailDrafts,id.staffKey)
+        ? state.ackEmailDrafts[id.staffKey]
+        : String(existing.email||'').replace(/@mahidol\.ac\.th$/i,'');
+      const email=ackEmailValue(raw);
+
+      if(email && !email.endsWith('@mahidol.ac.th')) return toast(`Mahidol ID ของ ${id.displayName} ไม่ถูกต้อง`);
       if(email){
         if(seen.has(email)) return toast(`มี Mahidol ID ซ้ำ: ${email}`);
         seen.add(email);
         upserts.push({
-          staff_key:staffKey,
-          employee_code:employeeCode||null,
-          display_name:displayName,
+          staff_key:id.staffKey,
+          employee_code:id.employeeCode||null,
+          display_name:id.displayName,
           email,
           active:true,
           updated_at:new Date().toISOString(),
           updated_by:String(state.session?.user?.email||'')
         });
-      }else if(state.ackPeople[staffKey]){
-        deletes.push(staffKey);
+      }else if(existing.staff_key){
+        deletes.push(id.staffKey);
       }
     }
 
@@ -1874,6 +1990,7 @@
         const {error}=await state.sb.from('ot_ack_people').delete().in('staff_key',deletes);
         if(error) throw error;
       }
+      state.ackEmailDrafts={};
       await loadAckManagerData();
       if(state.snapshotAt) await syncAckRequests();
       await loadManagerOwnAck();

@@ -7,13 +7,13 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="default" />
   <meta name="apple-mobile-web-app-title" content="LAB OT" />
-  <link rel="manifest" href="manifest.webmanifest?v=20260903-9" />
+  <link rel="manifest" href="manifest.webmanifest?v=20260903-10" />
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
   <title>LAB OT — LAB / Molec / Bacteria</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=20260903-v225" />
+  <link rel="stylesheet" href="styles.css?v=20260903-v226" />
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3EOT%3C/text%3E%3C/svg%3E">
   <style>
     /* Critical: author CSS (.center-shell { display:grid }) must not override HTML hidden state */
@@ -158,76 +158,119 @@
         </section>
 
         <section id="resultArea" hidden>
-          <div class="summary-grid five">
-            <div class="metric"><span>รอบ OT</span><b id="cycleMetric">-</b></div>
-            <div class="metric"><span>จำนวนคน</span><b id="staffMetric">0</b></div>
-            <div class="metric"><span>รายการเวร</span><b id="assignmentMetric">0</b></div>
-            <div class="metric"><span>OT รวม</span><b id="hoursMetric">0 ชม.</b></div>
-            <div class="metric warn"><span>เตือนวันลา</span><b id="conflictMetric">0</b></div>
-          </div>
-
-          <section class="card">
-            <div class="section-head"><div><h2>ตรวจไฟล์</h2></div></div>
-            <div id="validationList" class="validation-list"></div>
-          </section>
-
-          <section id="special328EligibilityCard" class="card special328-eligibility" hidden>
-            <div class="section-head">
+          <section class="card result-shell-card">
+            <div class="result-shell-head">
               <div>
-                <h2>ตรวจสิทธิ์ 00000328</h2>
-                <p>ตรวจชื่อ จำนวนครั้ง และยอดเงินก่อน Export</p>
+                <div class="section-kicker">ผลรอบนี้</div>
+                <h2>สรุปและตรวจสอบ OT</h2>
               </div>
-            </div>
-            <div id="special328EligibilityEmpty" class="empty-state">ยังไม่มีข้อมูล</div>
-            <div class="table-wrap"><table id="special328EligibilityTable"></table></div>
-          </section>
-
-          <section class="card">
-            <div class="section-head">
-              <div><h2>สรุป OT รายคน</h2></div>
-              <div class="actions">
+              <div class="actions result-main-actions">
                 <button id="exportBtn" class="secondary-btn" disabled>Export HR Excel</button>
                 <button id="saveBtn" class="primary-btn" disabled>ยืนยันและบันทึกรอบนี้</button>
               </div>
             </div>
-            <div class="table-wrap"><table id="summaryTable"></table></div>
-          </section>
 
-          <section id="ackManagerCard" class="card ack-manager-card" hidden>
-            <div class="section-head">
-              <div>
-                <h2>รับทราบ OT <span id="ackProgressBadge" class="pill">0 / 0 คน</span></h2>
-              </div>
-              <div class="actions">
-                <button id="refreshAckBtn" class="secondary-btn" type="button">รีเฟรช</button>
-                <button id="exportAckEvidenceBtn" class="secondary-btn" type="button" disabled>Export หลักฐาน</button>
-                <button id="saveAckEmailsBtn" class="primary-btn" type="button">บันทึก Mahidol ID</button>
-              </div>
+            <div class="summary-grid five compact-result-metrics">
+              <div class="metric"><span>รอบ OT</span><b id="cycleMetric">-</b></div>
+              <div class="metric"><span>จำนวนคน</span><b id="staffMetric">0</b></div>
+              <div class="metric"><span>รายการเวร</span><b id="assignmentMetric">0</b></div>
+              <div class="metric"><span>OT รวม</span><b id="hoursMetric">0 ชม.</b></div>
+              <div class="metric warn"><span>เตือนวันลา</span><b id="conflictMetric">0</b></div>
             </div>
-            <p id="ackManagerNote" class="notice-inline" hidden></p>
-            <div class="table-wrap"><table id="ackManagerTable"></table></div>
-          </section>
 
-          <section class="card">
-            <div class="section-head"><div><h2>สรุปตามหน่วย</h2></div></div>
-            <div class="table-wrap"><table id="unitSummaryTable"></table></div>
-          </section>
+            <nav class="result-tabs" aria-label="ผลรอบนี้">
+              <button class="result-tab active" type="button" data-result-tab="summary">สรุป OT</button>
+              <button class="result-tab" type="button" data-result-tab="ack">รับทราบ OT <span id="resultAckBadge" class="mini-badge">0/0</span></button>
+              <button class="result-tab" type="button" data-result-tab="leave">วันลา <span id="resultLeaveBadge" class="mini-badge">0</span></button>
+              <button class="result-tab" type="button" data-result-tab="validation">ตรวจไฟล์</button>
+            </nav>
 
-          <section class="card">
-            <div class="section-head"><div><h2>เวรที่ตรงกับวันลา</h2><p>ถ้ามีรายการ ให้ตรวจว่าเจ้าหน้าที่มาทำเวรจริงหรือมีการเปลี่ยนเวร</p></div></div>
-            <div id="conflictEmpty" class="empty-state">ยังไม่ได้ดึง Calendar</div>
-            <div class="table-wrap"><table id="conflictTable"></table></div>
-          </section>
+            <div id="result-panel-summary" class="result-panel active">
+              <section class="result-subsection">
+                <div class="section-head compact-section-head">
+                  <div><h2>สรุป OT รายคน</h2></div>
+                  <div class="result-search">
+                    <input id="summarySearchInput" type="search" placeholder="ค้นหาชื่อเจ้าหน้าที่">
+                    <button id="clearSummarySearchBtn" class="secondary-btn compact" type="button">ล้าง</button>
+                  </div>
+                </div>
+                <div id="summaryResultMeta" class="result-list-meta"></div>
+                <div class="table-wrap"><table id="summaryTable"></table></div>
+                <div id="summaryPager" class="compact-pager"></div>
+              </section>
 
-          <section class="card all-leave-card">
-            <div class="section-head">
-              <div>
-                <h2>วันลาทั้งหมดที่ดึงมา <span class="count-badge"><span id="leaveCountBadge">0</span> รายการ</span></h2>
-                <p id="leaveSourceSummary" class="leave-source-summary"></p>
-              </div>
+              <section class="result-subsection">
+                <div class="section-head compact-section-head"><div><h2>สรุปตามหน่วย</h2></div></div>
+                <div class="table-wrap"><table id="unitSummaryTable"></table></div>
+              </section>
+
+              <section id="special328EligibilityCard" class="result-subsection special328-eligibility" hidden>
+                <div class="section-head compact-section-head">
+                  <div><h2>ตรวจสิทธิ์ 00000328</h2></div>
+                </div>
+                <div id="special328EligibilityEmpty" class="empty-state">ยังไม่มีข้อมูล</div>
+                <div class="table-wrap"><table id="special328EligibilityTable"></table></div>
+              </section>
             </div>
-            <div id="allLeaveEmpty" class="empty-state">ยังไม่ได้ดึงวันลา</div>
-            <div class="table-wrap"><table id="allLeaveTable"></table></div>
+
+            <div id="result-panel-ack" class="result-panel">
+              <section id="ackManagerCard" class="result-subsection ack-manager-card" hidden>
+                <div class="section-head">
+                  <div>
+                    <h2>รับทราบ OT <span id="ackProgressBadge" class="pill">0 / 0 คน</span></h2>
+                  </div>
+                  <div class="actions">
+                    <button id="refreshAckBtn" class="secondary-btn" type="button">รีเฟรช</button>
+                    <button id="exportAckEvidenceBtn" class="secondary-btn" type="button" disabled>Export หลักฐาน</button>
+                    <button id="saveAckEmailsBtn" class="primary-btn" type="button">บันทึก Mahidol ID</button>
+                  </div>
+                </div>
+                <div class="result-search result-search-left">
+                  <input id="ackSearchInput" type="search" placeholder="ค้นหาชื่อเจ้าหน้าที่">
+                  <button id="clearAckSearchBtn" class="secondary-btn compact" type="button">ล้าง</button>
+                </div>
+                <p id="ackManagerNote" class="notice-inline" hidden></p>
+                <div id="ackResultMeta" class="result-list-meta"></div>
+                <div class="table-wrap"><table id="ackManagerTable"></table></div>
+                <div id="ackPager" class="compact-pager"></div>
+              </section>
+            </div>
+
+            <div id="result-panel-leave" class="result-panel">
+              <section class="result-subsection">
+                <div class="section-head compact-section-head">
+                  <div>
+                    <h2>เวรที่ตรงกับวันลา</h2>
+                  </div>
+                </div>
+                <div id="conflictEmpty" class="empty-state">ยังไม่ได้ดึงวันลา</div>
+                <div class="table-wrap"><table id="conflictTable"></table></div>
+                <div id="conflictPager" class="compact-pager"></div>
+              </section>
+
+              <section class="result-subsection all-leave-card">
+                <div class="section-head compact-section-head">
+                  <div>
+                    <h2>วันลาทั้งหมด <span class="count-badge"><span id="leaveCountBadge">0</span> รายการ</span></h2>
+                    <p id="leaveSourceSummary" class="leave-source-summary"></p>
+                  </div>
+                </div>
+                <div id="allLeaveEmpty" class="empty-state">ยังไม่ได้ดึงวันลา</div>
+                <div class="table-wrap"><table id="allLeaveTable"></table></div>
+                <div id="leavePager" class="compact-pager"></div>
+              </section>
+            </div>
+
+            <div id="result-panel-validation" class="result-panel">
+              <section class="result-subsection">
+                <div class="section-head compact-section-head"><div><h2>ตรวจไฟล์</h2></div></div>
+                <div id="validationQuick" class="validation-quick"></div>
+                <details class="validation-details">
+                  <summary>ดูรายละเอียดการตรวจไฟล์</summary>
+                  <div id="validationList" class="validation-list"></div>
+                </details>
+              </section>
+            </div>
           </section>
         </section>
       </section>
@@ -533,7 +576,7 @@
     };
     window.PSC_OT_CONFIG = window.LAB_OT_CONFIG;
   </script>
-  <script src="app.js?v=20260903-25"></script>
+  <script src="app.js?v=20260903-26"></script>
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(console.warn));
