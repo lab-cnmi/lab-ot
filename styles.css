@@ -53,3 +53,6 @@ label,.tab,.user-badge,.primary-btn,.secondary-btn,.ghost-btn,.danger-btn{font-w
 .special328-eligibility td:first-child{width:54px;text-align:center}
 .special328-eligibility input[type="checkbox"]{width:18px;height:18px;accent-color:#1f789f}
 .warn-text{color:#a46114;font-weight:600;font-size:.92em;margin-top:4px}
+
+/* V2.4 — LAB has no 160 THB/h rate */
+.no-160-note{font-weight:700;color:#255f78}
