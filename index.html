@@ -4,11 +4,16 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <meta name="theme-color" content="#f5f7fa" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="LAB OT" />
+  <link rel="manifest" href="manifest.webmanifest?v=20260903-1" />
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
   <title>LAB OT — LAB / Molec / Bacteria</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=20260903-ack1" />
+  <link rel="stylesheet" href="styles.css?v=20260903-v215" />
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3EOT%3C/text%3E%3C/svg%3E">
   <style>
     /* Critical: author CSS (.center-shell { display:grid }) must not override HTML hidden state */
@@ -35,7 +40,7 @@
       <form id="loginForm" class="stack">
         <label>Mahidol ID / Email
           <span class="email-suffix-field">
-            <input id="emailInput" type="text" autocomplete="username" inputmode="email" placeholder="เช่น parichat.ink" autocapitalize="none" spellcheck="false" required />
+            <input id="emailInput" type="text" autocomplete="username" inputmode="email" placeholder="username.sur" autocapitalize="none" spellcheck="false" required />
             <span class="email-suffix">@mahidol.ac.th</span>
           </span>
         </label>
@@ -43,8 +48,8 @@
           <input id="passwordInput" type="password" autocomplete="current-password" required />
         </label>
         <button class="primary-btn" type="submit">เข้าสู่ระบบ</button>
+        <button id="installAppBtn" class="text-btn install-app-btn" type="button" hidden>ติดตั้ง LAB OT เป็นแอป</button>
       </form>
-      <button id="registerAckBtn" class="text-btn auth-register-btn" type="button">ลงทะเบียนครั้งแรกสำหรับรับทราบ OT</button>
       <p id="loginError" class="error-text" hidden></p>
     </section>
   </main>
@@ -78,7 +83,9 @@
     <nav class="tabs" aria-label="เมนูหลัก">
       <button class="tab active" data-tab="work">ทำ OT รอบนี้</button>
       <button class="tab" data-tab="history">รอบที่บันทึกไว้</button>
-      <button class="tab" data-tab="guide">วิธีใช้ทุกเดือน</button>
+      <button class="tab" data-tab="myack">OT ของฉัน</button>
+      <button class="tab" data-tab="users" data-admin-only>ผู้ใช้งาน</button>
+      <button class="tab" data-tab="guide">วิธีใช้</button>
     </nav>
     <main class="page-shell">
       <section id="tab-work" class="tab-panel active">
@@ -237,40 +244,102 @@
         </section>
       </section>
 
+
+      <section id="tab-myack" class="tab-panel">
+        <section class="card">
+          <div class="section-head">
+            <div>
+              <h2>OT ของฉัน</h2>
+              <p>ตรวจรายละเอียดแล้วกดยืนยันรับทราบได้เหมือนเจ้าหน้าที่ทุกคน</p>
+            </div>
+          </div>
+          <div id="myAckEmpty" class="empty-state">กำลังโหลดรายการ…</div>
+          <div id="managerAckList" class="ack-list"></div>
+        </section>
+      </section>
+
+      <section id="tab-users" class="tab-panel" data-admin-only>
+        <section class="card user-admin-card">
+          <div class="section-head">
+            <div>
+              <h2>เพิ่มผู้ใช้งาน</h2>
+              <p>ใช้เฉพาะบัญชี Mahidol ของเจ้าหน้าที่ในหน่วย</p>
+            </div>
+          </div>
+          <form id="newUserForm" class="new-user-grid">
+            <label>เจ้าหน้าที่
+              <select id="newUserStaff" required></select>
+            </label>
+            <label>Mahidol ID
+              <span class="email-suffix-field">
+                <input id="newUserUsername" type="text" placeholder="username.sur" autocapitalize="none" spellcheck="false" required>
+                <span class="email-suffix">@mahidol.ac.th</span>
+              </span>
+            </label>
+            <label>ตำแหน่ง
+              <input id="newUserPosition" type="text" placeholder="เช่น นักเทคนิคการแพทย์">
+            </label>
+            <label>รหัสผ่านชั่วคราว
+              <input id="newUserPassword" type="password" minlength="8" placeholder="อย่างน้อย 8 ตัวอักษร" required>
+            </label>
+            <button id="createUserBtn" class="primary-btn" type="submit">สร้างบัญชี</button>
+          </form>
+          <p id="newUserError" class="error-text" hidden></p>
+        </section>
+
+        <section class="card">
+          <div class="section-head">
+            <div><h2>รายชื่อผู้ใช้งาน</h2></div>
+            <button class="secondary-btn" type="button" onclick="void 0" id="reloadManagedUsersBtn">รีเฟรช</button>
+          </div>
+          <div id="managedUsersEmpty" class="empty-state">กำลังโหลดรายชื่อ…</div>
+          <div class="table-wrap"><table id="managedUsersTable"></table></div>
+        </section>
+      </section>
+
       <section id="tab-guide" class="tab-panel">
         <section class="guide-card simple-guide">
-          <h2>วิธีใช้ทุกเดือน</h2>
-          <p class="guide-intro">ทำตามลำดับนี้ได้เลย</p>
+          <h2>วิธีใช้</h2>
+
+          <h3>สำหรับผู้ทำรอบ OT</h3>
           <ol class="guide-steps">
-            <li><b>เลือกรอบ OT</b><span>เลือกเดือนที่ต้องการเบิก เช่น “กันยายน 2569” ระบบจะแสดง 16 ส.ค. – 15 ก.ย. ให้อัตโนมัติ</span></li>
-            <li><b>เลือกไฟล์เวรให้ครบ 3 หน่วย</b><span>เลือกไฟล์ LAB, Molec และ Bacteria ของรอบนั้น</span></li>
-            <li><b>ใส่วันที่ 00000328 ถ้ามี</b><span>ถ้า HR แจ้งวันพิเศษช่วงปีใหม่หรือสงกรานต์ ให้เพิ่มวันที่แล้วกด “บันทึกวันที่” ถ้าไม่มีให้ข้าม</span></li>
-            <li><b>กด “ดึงวันลา”</b><span>หลังดึงแล้ว ดูหัวข้อ “วันลาทั้งหมดที่ดึงมา” เพื่อตรวจว่ารายการเข้ามาครบ</span></li>
-            <li><b>ตรวจรายการที่ระบบเตือน</b><span>ถ้ามีคนติดวันลา ให้เช็กว่าเปลี่ยนเวรหรือมาทำงานจริงก่อน</span></li>
-            <li><b>กด “ยืนยันและบันทึกรอบนี้”</b><span>เมื่อข้อมูลถูกต้องแล้ว ให้บันทึกรอบไว้</span></li>
-            <li><b>ให้เจ้าหน้าที่รับทราบ</b><span>ใส่ Mahidol ID ของแต่ละคนครั้งแรก แล้วติดตามสถานะในหัวข้อ “รับทราบ OT”</span></li><li><b>กด “Export HR Excel”</b><span>ระบบจะจัดรายการสำหรับ HR ให้พร้อม รวมสิทธิ์ 00000328 ถ้ามี</span></li>
+            <li><b>เลือกรอบเดือน</b><span>เช่น รอบเดือนกันยายน คือวันที่ 16 สิงหาคม ถึง 15 กันยายน</span></li>
+            <li><b>เลือกไฟล์เวรให้ครบ 3 หน่วย</b><span>เลือก LAB, Molec และ Bacteria ของรอบนั้น</span></li>
+            <li><b>ใส่วันที่ 00000328 ถ้ามี</b><span>ใส่เฉพาะวันที่ HR แจ้งช่วงปีใหม่หรือสงกรานต์ ถ้าเดือนไหนไม่มีให้ข้าม</span></li>
+            <li><b>ดึงวันลา</b><span>ตรวจจำนวนวันลาที่ดึงมา และดูว่ามีรายการใดตรงกับเวรหรือไม่</span></li>
+            <li><b>ตรวจสรุป OT</b><span>เช็กชื่อ ชั่วโมง และรายการเตือนให้เรียบร้อย</span></li>
+            <li><b>บันทึกรอบ</b><span>เมื่อข้อมูลถูกต้องแล้ว กด “ยืนยันและบันทึกรอบนี้”</span></li>
+            <li><b>ติดตามการรับทราบ</b><span>ดูหัวข้อ “รับทราบ OT” ว่าใครรับทราบแล้วและใครยังค้างอยู่</span></li>
+            <li><b>Export</b><span>Export HR Excel และ Export หลักฐานการรับทราบเมื่อพร้อมส่งงาน</span></li>
           </ol>
-          <div class="simple-note"><b>ถ้าไฟล์ไม่ตรงรอบหรือข้อมูลผิด</b><span>ดูคำเตือนในหน้า “ทำ OT รอบนี้” แล้วแก้ไฟล์ก่อน Export</span></div>
+
+          <h3>เพิ่มบัญชีเจ้าหน้าที่ครั้งแรก</h3>
+          <ol class="guide-steps">
+            <li><b>เปิดเมนู “ผู้ใช้งาน”</b><span>เลือกชื่อเจ้าหน้าที่ ใส่ Mahidol ID และรหัสผ่านชั่วคราว</span></li>
+            <li><b>กด “สร้างบัญชี”</b><span>แจ้ง Mahidol ID และรหัสชั่วคราวให้เจ้าหน้าที่คนนั้น</span></li>
+            <li><b>ครั้งแรกที่เข้าใช้</b><span>ระบบจะให้เจ้าหน้าที่ตั้งรหัสผ่านใหม่ของตนเองก่อนใช้งาน</span></li>
+            <li><b>ลืมรหัสผ่าน</b><span>กด “Reset password” ที่รายชื่อผู้ใช้งาน แล้วตั้งรหัสชั่วคราวใหม่ให้เจ้าหน้าที่</span></li>
+          </ol>
+
+          <h3>สำหรับเจ้าหน้าที่รับทราบ OT</h3>
+          <ol class="guide-steps">
+            <li><b>เข้าสู่ระบบ</b><span>กรอกเฉพาะ Mahidol ID เช่น username.sur และรหัสผ่าน</span></li>
+            <li><b>เปิดรอบ OT</b><span>ดูยอด OT และเปิดรายละเอียดเวรของตนเอง</span></li>
+            <li><b>ตรวจข้อมูล</b><span>ถ้าข้อมูลถูกต้อง ให้ติ๊กข้อความรับทราบ</span></li>
+            <li><b>กด “ยืนยันรับทราบ”</b><span>เมื่อบันทึกแล้วจะแสดงวันและเวลาที่รับทราบ</span></li>
+            <li><b>ถ้ารายการถูกแก้ภายหลัง</b><span>ระบบจะให้รับทราบใหม่เฉพาะรอบที่ข้อมูลของคุณเปลี่ยน</span></li>
+          </ol>
+
+          <h3>ติดตั้งบนมือถือ</h3>
+          <div class="mobile-guide-grid">
+            <div><b>Android</b><span>เปิด LAB OT ด้วย Chrome → เลือก “ติดตั้งแอป” หรือ “เพิ่มไปยังหน้าจอหลัก”</span></div>
+            <div><b>iPhone / iPad</b><span>เปิด LAB OT ด้วย Safari → กด Share → “เพิ่มไปยังหน้าจอโฮม” → เพิ่ม</span></div>
+          </div>
         </section>
       </section>
     </main>
   </div>
 
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-  <script>
-    // Runtime config embedded in index.html to avoid stale config.js cache on GitHub Pages.
-    window.LAB_OT_CONFIG = {
-      SUPABASE_URL: 'https://xjbwuyhdpsmfimzaradu.supabase.co',
-      SUPABASE_KEY: 'sb_publishable_yyLkUtatgoov6hR50VeLHQ_P8WGFZ-G',
-      USERS: {
-        'parichat.ink@mahidol.ac.th': { role: 'admin', label: 'Admin' },
-        'paleerat.ran@mahidol.ac.th': { role: 'staff', label: 'Staff' }
-      }
-    };
-    window.PSC_OT_CONFIG = window.LAB_OT_CONFIG;
-  </script>
-  <script src="app.js?v=20260903-16"></script>
 
 
   <main id="ackView" class="ack-view" hidden>
@@ -281,6 +350,7 @@
       </div>
       <div class="topbar-actions">
         <span id="ackLoginBadge" class="user-badge"></span>
+        <button id="ackInstallAppBtn" class="ghost-btn" type="button" hidden>ติดตั้งแอป</button>
         <button id="ackChangePasswordBtn" class="ghost-btn" type="button">เปลี่ยนรหัสผ่าน</button>
         <button id="ackLogoutBtn" class="ghost-btn" type="button">ออกจากระบบ</button>
       </div>
@@ -291,12 +361,38 @@
     </main>
   </main>
 
+
+  <div id="adminResetPasswordModal" class="modal-backdrop" hidden>
+    <section class="modal-card password-modal" role="dialog" aria-modal="true" aria-labelledby="adminResetPasswordTitle">
+      <div class="modal-head">
+        <div>
+          <h2 id="adminResetPasswordTitle">Reset password</h2>
+          <p id="resetUserEmail"></p>
+        </div>
+        <button id="adminResetPasswordCloseBtn" class="icon-btn" type="button" aria-label="ปิด">×</button>
+      </div>
+      <form id="adminResetPasswordForm" class="stack">
+        <label>รหัสผ่านชั่วคราวใหม่
+          <input id="adminTempPassword" type="password" minlength="8" required>
+        </label>
+        <label>ยืนยันรหัสผ่านชั่วคราว
+          <input id="adminTempPasswordConfirm" type="password" minlength="8" required>
+        </label>
+        <p id="adminResetPasswordError" class="error-text" hidden></p>
+        <div class="modal-actions">
+          <button id="adminResetPasswordCancelBtn" class="ghost-btn" type="button">ยกเลิก</button>
+          <button id="adminResetPasswordSaveBtn" class="primary-btn" type="submit">บันทึกรหัสชั่วคราว</button>
+        </div>
+      </form>
+    </section>
+  </div>
+
   <div id="passwordModal" class="modal-backdrop" hidden>
     <section class="modal-card password-modal" role="dialog" aria-modal="true" aria-labelledby="passwordModalTitle">
       <div class="modal-head">
         <div>
           <h2 id="passwordModalTitle">เปลี่ยนรหัสผ่าน</h2>
-          <p>ใช้กับบัญชีที่กำลังเข้าสู่ระบบอยู่</p>
+          <p id="passwordModalHelper">เปลี่ยนรหัสผ่านของบัญชีนี้</p>
         </div>
         <button id="closePasswordModalBtn" class="icon-btn" type="button" aria-label="ปิด">×</button>
       </div>
@@ -319,6 +415,27 @@
       </form>
     </section>
   </div>
+
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script>
+    window.LAB_OT_CONFIG = {
+      SUPABASE_URL: 'https://xjbwuyhdpsmfimzaradu.supabase.co',
+      SUPABASE_KEY: 'sb_publishable_yyLkUtatgoov6hR50VeLHQ_P8WGFZ-G',
+      USERS: {
+        'parichat.ink@mahidol.ac.th': { role: 'admin', label: 'Admin' },
+        'paleerat.ran@mahidol.ac.th': { role: 'admin', label: 'Admin' }
+      }
+    };
+    window.PSC_OT_CONFIG = window.LAB_OT_CONFIG;
+  </script>
+  <script src="app.js?v=20260903-17"></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(console.warn));
+    }
+  </script>
 
 </body>
 </html>

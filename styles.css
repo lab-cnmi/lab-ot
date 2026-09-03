@@ -527,3 +527,48 @@ td{line-height:1.45}
   .ack-topbar{align-items:flex-start}
   .ack-page-shell{width:min(100% - 20px,980px);margin-top:16px}
 }
+
+
+/* V2.15 — user management + mobile app */
+.install-app-btn{margin-top:2px}
+.new-user-grid{
+  display:grid;
+  grid-template-columns:1.15fr 1fr 1fr 1fr auto;
+  gap:10px;
+  align-items:end;
+}
+.new-user-grid label{min-width:0}
+.new-user-grid select,.new-user-grid input{width:100%}
+.user-admin-card{border-color:#dce7ed}
+.mobile-guide-grid{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:12px;
+  margin-top:10px;
+}
+.mobile-guide-grid>div{
+  padding:14px;
+  border:1px solid #e0e8ed;
+  border-radius:14px;
+  background:#f8fafb;
+}
+.mobile-guide-grid b,.mobile-guide-grid span{display:block}
+.mobile-guide-grid b{font-size:15px;margin-bottom:4px}
+.mobile-guide-grid span{font-size:14px;line-height:1.55;color:#63798a}
+.simple-guide h3{
+  margin:26px 0 8px;
+  font-size:17px;
+  font-weight:700;
+  color:#263b4c;
+}
+#managedUsersTable td:last-child{white-space:nowrap}
+@media(max-width:1100px){
+  .new-user-grid{grid-template-columns:1fr 1fr}
+  .new-user-grid button{width:100%}
+}
+@media(max-width:680px){
+  .new-user-grid{grid-template-columns:1fr}
+  .mobile-guide-grid{grid-template-columns:1fr}
+  .tabs{overflow-x:auto;white-space:nowrap}
+  .tab{flex:0 0 auto}
+}

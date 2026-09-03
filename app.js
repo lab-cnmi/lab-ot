@@ -4,7 +4,7 @@
   const CFG = window.LAB_OT_CONFIG || window.PSC_OT_CONFIG || {};
   const USERS = CFG.USERS || {
     'parichat.ink@mahidol.ac.th': { role: 'admin', label: 'Admin' },
-    'paleerat.ran@mahidol.ac.th': { role: 'staff', label: 'Staff' }
+    'paleerat.ran@mahidol.ac.th': { role: 'admin', label: 'Admin' }
   };
   const normalizedUsers = Object.fromEntries(
     Object.entries(USERS).map(([email, info]) => [String(email).trim().toLowerCase(), info])
@@ -43,7 +43,11 @@
     ackPeople: {},
     ackRows: [],
     ackDbReady: true,
-    ackPerson: null
+    ackPerson: null,
+    managedUsers: [],
+    resetUser: null,
+    forcePasswordChange: false,
+    installPrompt: null
   };
 
   const $ = id => document.getElementById(id);
@@ -146,7 +150,7 @@
   }
 
   async function init() {
-    bindUI(); initCycleControls();
+    bindUI(); initCycleControls(); setupPwaInstall(); populateUserStaffSelect();
     if (!configReady()) { showOnly('setupView'); return; }
     state.sb = window.supabase.createClient(CFG.SUPABASE_URL, CFG.SUPABASE_KEY || CFG.SUPABASE_ANON_KEY);
     const { data } = await state.sb.auth.getSession();
@@ -229,7 +233,9 @@
       showOnly('appView');
       const savedView = info.role === 'admin' ? sessionStorage.getItem('labot_view_role') : 'staff';
       applyViewRole(savedView === 'staff' ? 'staff' : info.role, {persist:false});
-      await Promise.all([loadHistory(), loadSpecial328Settings(), loadAckManagerData()]);
+      await Promise.all([loadHistory(), loadSpecial328Settings(), loadAckManagerData(), loadManagerOwnAck()]);
+      if (state.actualRole === 'admin') loadManagedUsers();
+      maybeForcePasswordChange();
       return;
     }
 
@@ -258,6 +264,7 @@
       $('ackLoginBadge').textContent = `${person.display_name} · ${email}`;
       showOnly('ackView');
       await loadAckPortal();
+      maybeForcePasswordChange();
     } catch (err) {
       console.error('ack role lookup failed', err);
       await state.sb.auth.signOut();
@@ -287,71 +294,38 @@
   }
 
 
-  async function registerAckAccount() {
-    $('loginError').hidden = true;
-    const email = normalizeMahidolEmail($('emailInput').value);
-    const password = String($('passwordInput').value || '');
-
-    if (!email.endsWith('@mahidol.ac.th')) {
-      $('loginError').textContent='กรุณาใช้บัญชี @mahidol.ac.th';
-      $('loginError').hidden=false;
-      return;
-    }
-    if (password.length < 8) {
-      $('loginError').textContent='ตั้งรหัสผ่านอย่างน้อย 8 ตัวอักษร';
-      $('loginError').hidden=false;
-      return;
-    }
-
-    try {
-      const { data: allowed, error: checkError } = await state.sb.rpc('can_register_ot_ack', { p_email: email });
-      if (checkError) throw checkError;
-      if (!allowed) {
-        $('loginError').textContent='Mahidol ID นี้ยังไม่ได้ถูกผูกกับรายชื่อรับทราบ OT กรุณาแจ้งผู้จัดทำ OT';
-        $('loginError').hidden=false;
-        return;
-      }
-
-      const { data, error } = await state.sb.auth.signUp({ email, password });
-      if (error) throw error;
-
-      if (data?.user && Array.isArray(data.user.identities) && data.user.identities.length === 0) {
-        $('loginError').textContent='บัญชีนี้เคยลงทะเบียนแล้ว ให้ใช้ปุ่ม “เข้าสู่ระบบ”';
-        $('loginError').hidden=false;
-        return;
-      }
-
-      if (data?.session) {
-        await acceptSession(data.session);
-      } else {
-        $('loginError').textContent='ลงทะเบียนแล้ว กรุณาตรวจอีเมล Mahidol เพื่อยืนยันบัญชี แล้วกลับมาเข้าสู่ระบบ';
-        $('loginError').hidden=false;
-        $('loginError').classList.add('success-message');
-      }
-    } catch (err) {
-      console.error('ack registration failed', err);
-      $('loginError').textContent = String(err?.message || '').includes('can_register_ot_ack')
-        ? 'กรุณาให้ Admin ติดตั้งระบบรับทราบ OT ใน Supabase ก่อน'
-        : (err?.message || 'ลงทะเบียนไม่สำเร็จ');
-      $('loginError').hidden=false;
-    }
-  }
 
 
-  function openPasswordModal() {
+
+  function openPasswordModal(force=false) {
     if (!state.session?.user?.email || state.offline) {
       return toast('โหมดทดลองไม่สามารถเปลี่ยนรหัสผ่านได้');
     }
+    state.forcePasswordChange = !!force;
     const modal=$('passwordModal');
     const form=$('passwordChangeForm');
     const err=$('passwordChangeError');
+    const title=$('passwordModalTitle');
+    const helper=$('passwordModalHelper');
+    const close=$('closePasswordModalBtn');
+    const cancel=$('cancelPasswordBtn');
     if (form) form.reset();
     if (err) { err.hidden=true; err.textContent=''; }
+    if (title) title.textContent = force ? 'ตั้งรหัสผ่านใหม่' : 'เปลี่ยนรหัสผ่าน';
+    if (helper) helper.textContent = force ? 'กรอกรหัสชั่วคราวที่ได้รับ แล้วตั้งรหัสใหม่ของคุณ' : 'เปลี่ยนรหัสผ่านของบัญชีนี้';
+    if (close) close.hidden = force;
+    if (cancel) cancel.hidden = force;
     if (modal) modal.hidden=false;
     setTimeout(()=>$('currentPasswordInput')?.focus(),30);
   }
 
+  function maybeForcePasswordChange() {
+    const must = !!state.session?.user?.user_metadata?.must_change_password;
+    if (must) setTimeout(()=>openPasswordModal(true),80);
+  }
+
   function closePasswordModal() {
+    if (state.forcePasswordChange) return;
     const modal=$('passwordModal');
     const form=$('passwordChangeForm');
     const err=$('passwordChangeError');
@@ -396,13 +370,21 @@
         return;
       }
 
+      const meta={...(state.session?.user?.user_metadata||{}),must_change_password:false};
       const { data, error: updateError } = await state.sb.auth.updateUser({
-        password: newPassword
+        password: newPassword,
+        data: meta
       });
       if (updateError) throw updateError;
 
       if (data?.user) state.session.user = data.user;
-      closePasswordModal();
+      state.forcePasswordChange=false;
+      const close=$('closePasswordModalBtn'), cancel=$('cancelPasswordBtn');
+      if(close) close.hidden=false;
+      if(cancel) cancel.hidden=false;
+      const modal=$('passwordModal'), form=$('passwordChangeForm');
+      if(modal) modal.hidden=true;
+      if(form) form.reset();
       toast('เปลี่ยนรหัสผ่านเรียบร้อยแล้ว');
     } catch (err) {
       console.error('change password failed', err);
@@ -417,14 +399,284 @@
     location.reload();
   }
 
+
+  /* ===========================
+     PWA INSTALL
+     =========================== */
+  function setupPwaInstall() {
+    const btn=$('installAppBtn'), ackBtn=$('ackInstallAppBtn');
+    const standalone=window.matchMedia?.('(display-mode: standalone)')?.matches || window.navigator.standalone===true;
+    if(standalone){
+      if(btn) btn.hidden=true;
+      if(ackBtn) ackBtn.hidden=true;
+      return;
+    }
+    const isiOS=/iphone|ipad|ipod/i.test(navigator.userAgent);
+    if(isiOS){
+      if(btn) btn.hidden=false;
+      if(ackBtn) ackBtn.hidden=false;
+    }
+    window.addEventListener('beforeinstallprompt',e=>{
+      e.preventDefault();
+      state.installPrompt=e;
+      if(btn) btn.hidden=false;
+      if(ackBtn) ackBtn.hidden=false;
+    });
+    window.addEventListener('appinstalled',()=>{
+      state.installPrompt=null;
+      if(btn) btn.hidden=true;
+      if(ackBtn) ackBtn.hidden=true;
+      toast('ติดตั้ง LAB OT แล้ว');
+    });
+  }
+
+  async function installApp() {
+    if(state.installPrompt){
+      state.installPrompt.prompt();
+      await state.installPrompt.userChoice;
+      state.installPrompt=null;
+      return;
+    }
+    const isiOS=/iphone|ipad|ipod/i.test(navigator.userAgent);
+    if(isiOS){
+      alert('iPhone / iPad\\n1. เปิดหน้านี้ด้วย Safari\\n2. กดปุ่ม Share\\n3. เลือก “เพิ่มไปยังหน้าจอโฮม”\\n4. กด “เพิ่ม”');
+      return;
+    }
+    alert('เปิดเมนูของเบราว์เซอร์ แล้วเลือก “ติดตั้งแอป” หรือ “เพิ่มไปยังหน้าจอหลัก”');
+  }
+
+  /* ===========================
+     MANAGER — OWN ACKNOWLEDGEMENT
+     =========================== */
+  function renderAckCards(rows, list, empty) {
+    if(!list||!empty) return;
+    const data=rows||[];
+    if(!data.length){
+      empty.hidden=false;
+      empty.textContent='ยังไม่มีรายการ OT ที่ส่งมาให้รับทราบ';
+      list.innerHTML='';
+      return;
+    }
+    empty.hidden=true;
+    list.innerHTML=data.map(r=>{
+      const d=r.detail_json||{};
+      const assignments=Array.isArray(d.assignments)?d.assignments:[];
+      const acknowledged=r.status==='acknowledged';
+      const specialCount=Number(d.special328Count||0);
+      return `<article class="ack-person-card">
+        <div class="ack-person-head">
+          <div>
+            <div class="section-kicker">รอบ OT</div>
+            <h2>${esc(fmtThaiRange(r.cycle_start,r.cycle_end))}</h2>
+          </div>
+          ${acknowledged
+            ? `<span class="ack-status done">✓ รับทราบแล้ว</span>`
+            : `<span class="ack-status pending">รอรับทราบ</span>`}
+        </div>
+        <div class="ack-metrics">
+          <div><span>OT รวม</span><b>${Number(r.ot_hours||0).toLocaleString('th-TH')} ชม.</b></div>
+          <div><span>LAB</span><b>${Number(d.unitHours?.LAB||0)}</b></div>
+          <div><span>Molec</span><b>${Number(d.unitHours?.Molec||0)}</b></div>
+          <div><span>Bacteria</span><b>${Number(d.unitHours?.Bacteria||0)}</b></div>
+          ${specialCount?`<div><span>00000328</span><b>${specialCount} ครั้ง</b></div>`:''}
+        </div>
+        <details class="ack-details">
+          <summary>ดูรายละเอียดเวร ${assignments.length} รายการ</summary>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>วันที่</th><th>หน่วย</th><th>เวร</th><th>เวลา</th><th class="num">ชม.</th></tr></thead>
+              <tbody>${assignments.map(a=>`<tr>
+                <td>${esc(fmtThaiDate(a.date))}</td><td>${esc(a.unit)}</td><td>${esc(a.duty)}</td>
+                <td>${esc(a.time)}</td><td class="num">${Number(a.hours||0)}</td>
+              </tr>`).join('')}</tbody>
+            </table>
+          </div>
+        </details>
+        ${acknowledged
+          ? `<div class="ack-confirmed">รับทราบเมื่อ ${esc(fmtDateTimeThai(r.acknowledged_at))}</div>`
+          : `<label class="ack-check">
+              <input type="checkbox" id="ackCheck_${esc(r.cycle_key)}">
+              <span>ข้าพเจ้าได้ตรวจสอบและรับทราบรายการ OT ของตนเองแล้ว</span>
+            </label>
+            <button class="primary-btn ack-submit-btn" type="button" data-ack-cycle="${esc(r.cycle_key)}">ยืนยันรับทราบ</button>`}
+      </article>`;
+    }).join('');
+  }
+
+  async function loadManagerOwnAck() {
+    if(state.offline || !state.sb || !state.session?.user?.email || !normalizedUsers[String(state.session.user.email).toLowerCase()]) return;
+    const email=String(state.session.user.email).toLowerCase();
+    const {data,error}=await state.sb.from('ot_acknowledgements')
+      .select('*').eq('email',email).order('cycle_start',{ascending:false});
+    if(error){
+      if($('myAckEmpty')){$('myAckEmpty').hidden=false;$('myAckEmpty').textContent='เปิดรายการรับทราบไม่ได้';}
+      return;
+    }
+    renderAckCards(data||[], $('managerAckList'), $('myAckEmpty'));
+  }
+
+  /* ===========================
+     USER MANAGEMENT — ADMIN
+     =========================== */
+  function managerDirectory() {
+    return Object.entries(HR_STAFF_MASTER)
+      .map(([nick,info])=>({
+        nick,
+        fullName:info.fullName,
+        employeeCode:String(info.employeeCode||'').replace(/\D/g,'').padStart(7,'0'),
+        staffKey:`emp:${String(info.employeeCode||'').replace(/\D/g,'').padStart(7,'0')}`
+      }))
+      .sort((a,b)=>a.fullName.localeCompare(b.fullName,'th'));
+  }
+
+  function populateUserStaffSelect() {
+    const sel=$('newUserStaff');
+    if(!sel) return;
+    const rows=managerDirectory();
+    sel.innerHTML='<option value="">เลือกเจ้าหน้าที่</option>'+rows.map(x=>
+      `<option value="${esc(x.staffKey)}" data-name="${esc(x.fullName)}" data-employee="${esc(x.employeeCode)}">${esc(x.fullName)} (${esc(x.employeeCode)})</option>`
+    ).join('');
+  }
+
+  async function invokeAdminUsers(action,payload={}) {
+    const {data,error}=await state.sb.functions.invoke('admin-users',{body:{action,...payload}});
+    if(error) throw error;
+    if(data?.error) throw new Error(data.error);
+    return data;
+  }
+
+  async function loadManagedUsers() {
+    const table=$('managedUsersTable'), empty=$('managedUsersEmpty');
+    if(!table||!empty||state.actualRole!=='admin'||!state.sb) return;
+    empty.hidden=false; empty.textContent='กำลังโหลดรายชื่อ…'; table.innerHTML='';
+    try{
+      const data=await invokeAdminUsers('list');
+      state.managedUsers=Array.isArray(data?.users)?data.users:[];
+      if(!state.managedUsers.length){
+        empty.textContent='ยังไม่มีบัญชีผู้ใช้งาน';
+        return;
+      }
+      empty.hidden=true;
+      table.innerHTML=`<thead><tr>
+        <th>Mahidol ID</th><th>ชื่อ</th><th>หน้าที่</th><th>สถานะ</th><th>เข้าใช้ล่าสุด</th><th></th>
+      </tr></thead><tbody>${state.managedUsers.map(u=>{
+        const username=String(u.email||'').replace(/@mahidol\.ac\.th$/i,'');
+        const role=u.isManager?'Admin':'รับทราบ OT';
+        const first=u.mustChangePassword?'รอตั้งรหัสใหม่':'พร้อมใช้';
+        return `<tr>
+          <td><b>${esc(username)}</b><div class="subtle">@mahidol.ac.th</div></td>
+          <td>${esc(u.displayName||'-')}</td>
+          <td>${esc(role)}</td>
+          <td><span class="ack-status ${u.mustChangePassword?'pending':'done'}">${esc(first)}</span></td>
+          <td>${u.lastSignInAt?esc(fmtDateTimeThai(u.lastSignInAt)):'-'}</td>
+          <td><button class="secondary-btn compact" type="button" data-reset-user="${esc(u.id)}" data-reset-email="${esc(u.email)}">Reset password</button></td>
+        </tr>`;
+      }).join('')}</tbody>`;
+    }catch(err){
+      console.error('load users',err);
+      empty.hidden=false;
+      empty.textContent='ยังเปิดรายชื่อผู้ใช้งานไม่ได้';
+    }
+  }
+
+  async function createManagedUser(e) {
+    e.preventDefault();
+    if(state.actualRole!=='admin') return toast('ใช้ได้เฉพาะ Admin');
+    const sel=$('newUserStaff');
+    const option=sel?.selectedOptions?.[0];
+    const staffKey=String(sel?.value||'');
+    const displayName=String(option?.dataset?.name||'');
+    const employeeCode=String(option?.dataset?.employee||'');
+    const username=String($('newUserUsername')?.value||'').trim().toLowerCase().replace(/@mahidol\.ac\.th$/i,'');
+    const position=String($('newUserPosition')?.value||'').trim();
+    const password=String($('newUserPassword')?.value||'');
+    const err=$('newUserError');
+    if(err){err.hidden=true;err.textContent='';}
+    const fail=msg=>{if(err){err.textContent=msg;err.hidden=false;}};
+    if(!staffKey) return fail('กรุณาเลือกเจ้าหน้าที่');
+    if(!/^[a-z0-9._-]+$/.test(username)) return fail('Mahidol ID ไม่ถูกต้อง');
+    if(password.length<8) return fail('รหัสผ่านชั่วคราวต้องมีอย่างน้อย 8 ตัวอักษร');
+
+    const btn=$('createUserBtn');
+    if(btn){btn.disabled=true;btn.textContent='กำลังสร้าง…';}
+    try{
+      await invokeAdminUsers('create',{staffKey,employeeCode,displayName,position,username,password});
+      $('newUserForm')?.reset();
+      populateUserStaffSelect();
+      toast('สร้างบัญชีแล้ว');
+      await Promise.all([loadManagedUsers(),loadAckManagerData()]);
+    }catch(ex){
+      console.error('create user',ex);
+      fail(ex.message||'สร้างบัญชีไม่สำเร็จ');
+    }finally{
+      if(btn){btn.disabled=false;btn.textContent='สร้างบัญชี';}
+    }
+  }
+
+  function openResetUserPassword(userId,email) {
+    state.resetUser={id:userId,email};
+    const modal=$('adminResetPasswordModal'), label=$('resetUserEmail');
+    if(label) label.textContent=email||'';
+    $('adminResetPasswordForm')?.reset();
+    if($('adminResetPasswordError')){$('adminResetPasswordError').hidden=true;$('adminResetPasswordError').textContent='';}
+    if(modal) modal.hidden=false;
+    setTimeout(()=>$('adminTempPassword')?.focus(),40);
+  }
+
+  function closeResetUserPassword() {
+    state.resetUser=null;
+    if($('adminResetPasswordModal')) $('adminResetPasswordModal').hidden=true;
+    $('adminResetPasswordForm')?.reset();
+  }
+
+  async function resetManagedUserPassword(e) {
+    e.preventDefault();
+    if(!state.resetUser) return;
+    const password=String($('adminTempPassword')?.value||'');
+    const confirm=String($('adminTempPasswordConfirm')?.value||'');
+    const err=$('adminResetPasswordError');
+    if(err){err.hidden=true;err.textContent='';}
+    const fail=msg=>{if(err){err.textContent=msg;err.hidden=false;}};
+    if(password.length<8) return fail('รหัสผ่านชั่วคราวต้องมีอย่างน้อย 8 ตัวอักษร');
+    if(password!==confirm) return fail('ยืนยันรหัสผ่านไม่ตรงกัน');
+    const btn=$('adminResetPasswordSaveBtn');
+    if(btn){btn.disabled=true;btn.textContent='กำลังบันทึก…';}
+    try{
+      await invokeAdminUsers('reset',{userId:state.resetUser.id,password});
+      toast('Reset password แล้ว');
+      closeResetUserPassword();
+      await loadManagedUsers();
+    }catch(ex){
+      console.error('reset user',ex);
+      fail(ex.message||'Reset password ไม่สำเร็จ');
+    }finally{
+      if(btn){btn.disabled=false;btn.textContent='บันทึกรหัสชั่วคราว';}
+    }
+  }
+
   function bindUI() {
     $('loginForm').addEventListener('submit', login);
-    $('registerAckBtn')?.addEventListener('click', registerAckAccount);
+    $('installAppBtn')?.addEventListener('click', installApp);
+    $('ackInstallAppBtn')?.addEventListener('click', installApp);
     $('ackLogoutBtn')?.addEventListener('click', logout);
     $('ackChangePasswordBtn')?.addEventListener('click', openPasswordModal);
     $('saveAckEmailsBtn')?.addEventListener('click', saveAckMappings);
     $('exportAckEvidenceBtn')?.addEventListener('click', exportAckEvidence);
     $('refreshAckBtn')?.addEventListener('click', loadAckManagerData);
+    $('newUserForm')?.addEventListener('submit', createManagedUser);
+    $('reloadManagedUsersBtn')?.addEventListener('click', loadManagedUsers);
+    $('managedUsersTable')?.addEventListener('click', e=>{
+      const btn=e.target.closest('[data-reset-user]');
+      if(btn) openResetUserPassword(btn.dataset.resetUser,btn.dataset.resetEmail);
+    });
+    $('adminResetPasswordForm')?.addEventListener('submit', resetManagedUserPassword);
+    $('adminResetPasswordCancelBtn')?.addEventListener('click', closeResetUserPassword);
+    $('adminResetPasswordCloseBtn')?.addEventListener('click', closeResetUserPassword);
+    $('adminResetPasswordModal')?.addEventListener('click',e=>{if(e.target===$('adminResetPasswordModal'))closeResetUserPassword();});
+    $('managerAckList')?.addEventListener('click', e=>{
+      const btn=e.target.closest('[data-ack-cycle]');
+      if(btn) acknowledgeOwnCycle(btn.dataset.ackCycle);
+    });
     $('ackList')?.addEventListener('click', e => {
       const btn=e.target.closest('[data-ack-cycle]');
       if(btn) acknowledgeOwnCycle(btn.dataset.ackCycle);
@@ -435,7 +687,7 @@
     $('cancelPasswordBtn')?.addEventListener('click', closePasswordModal);
     $('passwordChangeForm')?.addEventListener('submit', changeOwnPassword);
     $('passwordModal')?.addEventListener('click', e => {
-      if (e.target === $('passwordModal')) closePasswordModal();
+      if (e.target === $('passwordModal') && !state.forcePasswordChange) closePasswordModal();
     });
     $('viewModeBtn')?.addEventListener('click', e => { e.stopPropagation(); toggleViewModeMenu(); });
     $('viewModeMenu')?.addEventListener('click', e => {
@@ -486,6 +738,8 @@
     document.querySelectorAll('.tab').forEach(x => x.classList.toggle('active', x.dataset.tab === name));
     document.querySelectorAll('.tab-panel').forEach(x => x.classList.toggle('active', x.id === `tab-${name}`));
     if (name === 'history') loadHistory();
+    if (name === 'users') loadManagedUsers();
+    if (name === 'myack') loadManagerOwnAck();
   }
 
   function setUnitStatus(unit, text, cls='') {
@@ -1022,6 +1276,7 @@
       }
       await loadAckManagerData();
       if(state.snapshotAt) await syncAckRequests();
+      await loadManagerOwnAck();
       toast('บันทึก Mahidol ID แล้ว');
     }catch(err){
       console.error('save ack mappings',err);
@@ -1121,63 +1376,12 @@
     const list=$('ackList'), empty=$('ackEmpty');
     if(!list||!empty||!state.session?.user?.email) return;
     const email=String(state.session.user.email).toLowerCase();
-
     const {data,error}=await state.sb.from('ot_acknowledgements')
       .select('*').eq('email',email).order('cycle_start',{ascending:false});
-
     if(error){
-      empty.hidden=false; empty.textContent=`เปิดรายการไม่ได้: ${error.message}`; list.innerHTML=''; return;
+      empty.hidden=false; empty.textContent='เปิดรายการไม่ได้'; list.innerHTML=''; return;
     }
-    const rows=data||[];
-    if(!rows.length){
-      empty.hidden=false; empty.textContent='ยังไม่มีรายการ OT ที่ส่งมาให้รับทราบ'; list.innerHTML=''; return;
-    }
-    empty.hidden=true;
-    list.innerHTML=rows.map(r=>{
-      const d=r.detail_json||{};
-      const assignments=Array.isArray(d.assignments)?d.assignments:[];
-      const acknowledged=r.status==='acknowledged';
-      const specialCount=Number(d.special328Count||0);
-      return `<article class="ack-person-card">
-        <div class="ack-person-head">
-          <div>
-            <div class="section-kicker">รอบ OT</div>
-            <h2>${esc(fmtThaiRange(r.cycle_start,r.cycle_end))}</h2>
-          </div>
-          ${acknowledged
-            ? `<span class="ack-status done">✓ รับทราบแล้ว</span>`
-            : `<span class="ack-status pending">รอรับทราบ</span>`}
-        </div>
-        <div class="ack-metrics">
-          <div><span>OT รวม</span><b>${Number(r.ot_hours||0).toLocaleString('th-TH')} ชม.</b></div>
-          <div><span>LAB</span><b>${Number(d.unitHours?.LAB||0)}</b></div>
-          <div><span>Molec</span><b>${Number(d.unitHours?.Molec||0)}</b></div>
-          <div><span>Bacteria</span><b>${Number(d.unitHours?.Bacteria||0)}</b></div>
-          ${specialCount?`<div><span>00000328</span><b>${specialCount} ครั้ง</b></div>`:''}
-        </div>
-
-        <details class="ack-details">
-          <summary>ดูรายละเอียดเวร ${assignments.length} รายการ</summary>
-          <div class="table-wrap">
-            <table>
-              <thead><tr><th>วันที่</th><th>หน่วย</th><th>เวร</th><th>เวลา</th><th class="num">ชม.</th></tr></thead>
-              <tbody>${assignments.map(a=>`<tr>
-                <td>${esc(fmtThaiDate(a.date))}</td><td>${esc(a.unit)}</td><td>${esc(a.duty)}</td>
-                <td>${esc(a.time)}</td><td class="num">${Number(a.hours||0)}</td>
-              </tr>`).join('')}</tbody>
-            </table>
-          </div>
-        </details>
-
-        ${acknowledged
-          ? `<div class="ack-confirmed">รับทราบเมื่อ ${esc(fmtDateTimeThai(r.acknowledged_at))}<br><span>${esc(r.acknowledged_by||'')}</span></div>`
-          : `<label class="ack-check">
-              <input type="checkbox" id="ackCheck_${esc(r.cycle_key)}">
-              <span>ข้าพเจ้าได้ตรวจสอบและรับทราบรายการ OT ของตนเองแล้ว</span>
-            </label>
-            <button class="primary-btn ack-submit-btn" type="button" data-ack-cycle="${esc(r.cycle_key)}">ยืนยันรับทราบ</button>`}
-      </article>`;
-    }).join('');
+    renderAckCards(data||[],list,empty);
   }
 
   async function acknowledgeOwnCycle(cycleKey) {
@@ -1189,7 +1393,8 @@
       const {data,error}=await state.sb.rpc('acknowledge_ot',{p_cycle_key:cycleKey});
       if(error) throw error;
       toast('บันทึกรับทราบเรียบร้อยแล้ว');
-      await loadAckPortal();
+      if(state.actualRole==='ack') await loadAckPortal();
+      else await Promise.all([loadManagerOwnAck(),loadAckManagerData()]);
     }catch(err){
       console.error('acknowledge OT',err);
       toast(`บันทึกรับทราบไม่สำเร็จ: ${err.message||err}`);
