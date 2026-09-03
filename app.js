@@ -24,6 +24,8 @@
     sb: null,
     session: null,
     role: null,
+    actualRole: null,
+    viewRole: null,
     offline: false,
     cycle: { start: '', end: '' },
     rawFiles: { LAB: null, Molec: null, Bacteria: null },
@@ -142,6 +144,44 @@
     state.sb.auth.onAuthStateChange((_event, session) => { if (session && !state.session) acceptSession(session); });
   }
 
+  function normalizeMahidolEmail(value) {
+    let raw = String(value || '').trim().toLowerCase().replace(/\s+/g, '');
+    if (!raw) return '';
+    if (raw.endsWith('@mahidol.ac.th')) raw = raw.slice(0, -'@mahidol.ac.th'.length);
+    if (raw.includes('@')) return raw; // lets the validation below reject another domain clearly
+    return `${raw}@mahidol.ac.th`;
+  }
+
+  function applyViewRole(role, {persist=true}={}) {
+    if (state.actualRole !== 'admin') role = state.actualRole || 'staff';
+    state.viewRole = role === 'staff' ? 'staff' : 'admin';
+    document.body.dataset.viewRole = state.viewRole;
+    const isStaffPreview = state.actualRole === 'admin' && state.viewRole === 'staff';
+    const wrap = $('viewModeWrap');
+    const menu = $('viewModeMenu');
+    const btn = $('viewModeBtn');
+    const label = $('viewModeBtnLabel');
+    const banner = $('staffPreviewBanner');
+    if (wrap) wrap.hidden = state.actualRole !== 'admin';
+    if (label) label.textContent = state.viewRole === 'staff' ? 'มุมมอง Staff' : 'มุมมอง Admin';
+    if (banner) banner.hidden = !isStaffPreview;
+    if (btn) btn.classList.toggle('staff-preview-active', isStaffPreview);
+    document.querySelectorAll('[data-admin-only]').forEach(el => { el.hidden = state.viewRole !== 'admin'; });
+    document.querySelectorAll('[data-staff-only]').forEach(el => { el.hidden = state.viewRole !== 'staff'; });
+    document.querySelectorAll('.view-mode-option').forEach(el => el.classList.toggle('active', el.dataset.viewRole === state.viewRole));
+    if (menu) menu.hidden = true;
+    if (btn) btn.setAttribute('aria-expanded', 'false');
+    if (persist && state.actualRole === 'admin') sessionStorage.setItem('labot_view_role', state.viewRole);
+  }
+
+  function toggleViewModeMenu() {
+    if (state.actualRole !== 'admin') return;
+    const menu = $('viewModeMenu'), btn = $('viewModeBtn');
+    const willOpen = !!menu?.hidden;
+    if (menu) menu.hidden = !willOpen;
+    if (btn) btn.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
+  }
+
   async function acceptSession(session) {
     const email = String(session?.user?.email || '').trim().toLowerCase();
     const info = normalizedUsers[email];
@@ -149,23 +189,31 @@
       await state.sb.auth.signOut();
       $('loginError').textContent = 'บัญชีนี้ไม่ได้รับอนุญาตให้ใช้ระบบ'; $('loginError').hidden = false; showOnly('authView'); return;
     }
-    state.session = session; state.role = info.role; state.offline = false;
+    state.session = session;
+    state.actualRole = info.role;
+    state.role = info.role; // สิทธิ์จริง ใช้กับการทำงานระบบ
+    state.offline = false;
     $('loginBadge').textContent = `${info.role === 'admin' ? 'Admin' : 'Staff'} · ${email}`;
     showOnly('appView');
+    const savedView = info.role === 'admin' ? sessionStorage.getItem('labot_view_role') : 'staff';
+    applyViewRole(savedView === 'staff' ? 'staff' : info.role, {persist:false});
     renderSpecialRateAdmin();
     await Promise.all([loadHistory(), loadSpecial328Settings()]);
   }
 
   function enterOffline() {
-    state.offline = true; state.role = 'demo'; state.session = { user:{ email:'โหมดทดสอบ' } };
+    state.offline = true; state.role = 'demo'; state.actualRole = 'demo'; state.viewRole = 'staff'; state.session = { user:{ email:'โหมดทดสอบ' } };
     $('loginBadge').textContent = 'โหมดทดสอบ · ไม่บันทึกฐานข้อมูล';
-    showOnly('appView'); renderSpecialRateAdmin(); recompute();
+    showOnly('appView'); applyViewRole('staff', {persist:false}); renderSpecialRateAdmin(); recompute();
   }
 
   async function login(e) {
     e.preventDefault(); $('loginError').hidden = true;
-    const email = String($('emailInput').value || '').trim().toLowerCase();
+    const email = normalizeMahidolEmail($('emailInput').value);
     const password = $('passwordInput').value;
+    if (!email.endsWith('@mahidol.ac.th')) {
+      $('loginError').textContent='ระบบนี้ใช้บัญชี @mahidol.ac.th เท่านั้น'; $('loginError').hidden=false; return;
+    }
     if (!normalizedUsers[email]) { $('loginError').textContent='บัญชีนี้ไม่ได้รับอนุญาตให้ใช้ระบบ'; $('loginError').hidden=false; return; }
     const { error } = await state.sb.auth.signInWithPassword({ email, password });
     if (error) { $('loginError').textContent = error.message || 'เข้าสู่ระบบไม่สำเร็จ'; $('loginError').hidden=false; }
@@ -179,6 +227,22 @@
   function bindUI() {
     $('loginForm').addEventListener('submit', login);
     $('logoutBtn').addEventListener('click', logout);
+    $('viewModeBtn')?.addEventListener('click', e => { e.stopPropagation(); toggleViewModeMenu(); });
+    $('viewModeMenu')?.addEventListener('click', e => {
+      const option = e.target.closest('[data-view-role]');
+      if (!option) return;
+      applyViewRole(option.dataset.viewRole);
+    });
+    document.addEventListener('click', e => {
+      if (!$('viewModeWrap')?.contains(e.target)) {
+        if ($('viewModeMenu')) $('viewModeMenu').hidden = true;
+        $('viewModeBtn')?.setAttribute('aria-expanded','false');
+      }
+    });
+    $('emailInput')?.addEventListener('blur', e => {
+      const v = String(e.target.value || '').trim();
+      e.target.value = v.replace(/@mahidol\.ac\.th$/i, '');
+    });
     $('offlineDemoBtn').addEventListener('click', enterOffline);
     $('cycleMonth').addEventListener('change', onCycleChange);
     $('cycleYear').addEventListener('change', onCycleChange);
