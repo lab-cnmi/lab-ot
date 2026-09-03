@@ -381,3 +381,149 @@ td{line-height:1.45}
   #changePasswordBtn{order:3}
   #logoutBtn{order:4}
 }
+
+
+/* V2.14 — electronic OT acknowledgement */
+.text-btn{
+  border:0;
+  background:transparent;
+  color:#28779d;
+  font-family:inherit;
+  font-size:13px;
+  font-weight:600;
+  cursor:pointer;
+  padding:8px 2px;
+}
+.auth-register-btn{align-self:flex-start}
+.success-message{color:#24714d!important}
+
+.ack-manager-card{border-color:#dbe7ee}
+.ack-email-field{
+  display:flex;
+  align-items:stretch;
+  min-width:290px;
+  max-width:380px;
+}
+.ack-email-field input{
+  min-width:0;
+  flex:1;
+  border:1px solid #d7e1e8;
+  border-right:0;
+  border-radius:9px 0 0 9px;
+  padding:8px 10px;
+  font-family:inherit;
+  font-size:13px;
+}
+.ack-email-field>span{
+  display:flex;
+  align-items:center;
+  padding:0 10px;
+  border:1px solid #d7e1e8;
+  border-radius:0 9px 9px 0;
+  background:#f3f7f9;
+  color:#587184;
+  font-size:12px;
+  white-space:nowrap;
+}
+.ack-status{
+  display:inline-flex;
+  align-items:center;
+  padding:5px 9px;
+  border-radius:999px;
+  font-size:12px;
+  font-weight:600;
+  white-space:nowrap;
+}
+.ack-status.done{background:#e8f6ee;color:#217148}
+.ack-status.pending{background:#fff2df;color:#96580e}
+.ack-status.neutral{background:#eff4f7;color:#61788a}
+.ack-time{margin-top:4px;font-size:11px;color:#758897}
+.notice-inline{
+  margin:0 0 12px;
+  padding:10px 12px;
+  border-radius:10px;
+  background:#fff3df;
+  color:#86520f;
+  font-size:13px;
+}
+
+.ack-view{
+  min-height:100vh;
+  background:#f4f7f9;
+}
+.ack-page-shell{
+  width:min(980px,calc(100% - 32px));
+  margin:28px auto 56px;
+}
+.ack-list{
+  display:grid;
+  gap:16px;
+}
+.ack-person-card{
+  background:#fff;
+  border:1px solid #dfe7ed;
+  border-radius:20px;
+  padding:20px;
+  box-shadow:0 12px 32px rgba(37,62,78,.06);
+}
+.ack-person-head{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:12px;
+}
+.ack-person-head h2{
+  margin:3px 0 0;
+  font-size:21px;
+}
+.ack-metrics{
+  display:flex;
+  flex-wrap:wrap;
+  gap:8px;
+  margin:16px 0;
+}
+.ack-metrics>div{
+  min-width:115px;
+  padding:10px 12px;
+  border:1px solid #e2e9ee;
+  border-radius:12px;
+  background:#f8fafb;
+}
+.ack-metrics span{display:block;font-size:11px;color:#768a99}
+.ack-metrics b{display:block;margin-top:2px;font-size:16px}
+.ack-details{
+  margin:12px 0 16px;
+  border-top:1px solid #e6ecef;
+  border-bottom:1px solid #e6ecef;
+  padding:11px 0;
+}
+.ack-details summary{
+  cursor:pointer;
+  color:#2a6e8e;
+  font-weight:600;
+}
+.ack-details .table-wrap{margin-top:10px}
+.ack-check{
+  display:flex;
+  gap:10px;
+  align-items:flex-start;
+  margin:14px 0;
+  font-weight:500;
+}
+.ack-check input{width:18px;height:18px;margin-top:2px}
+.ack-submit-btn{min-width:170px}
+.ack-confirmed{
+  padding:12px 14px;
+  border-radius:12px;
+  background:#eaf7ef;
+  color:#216b47;
+  font-weight:600;
+}
+.ack-confirmed span{font-weight:400;font-size:12px}
+
+@media(max-width:760px){
+  .ack-email-field{min-width:230px}
+  .ack-person-head{align-items:flex-start}
+  .ack-topbar{align-items:flex-start}
+  .ack-page-shell{width:min(100% - 20px,980px);margin-top:16px}
+}

@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=20260903-pass1" />
+  <link rel="stylesheet" href="styles.css?v=20260903-ack1" />
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3EOT%3C/text%3E%3C/svg%3E">
   <style>
     /* Critical: author CSS (.center-shell { display:grid }) must not override HTML hidden state */
@@ -44,6 +44,7 @@
         </label>
         <button class="primary-btn" type="submit">เข้าสู่ระบบ</button>
       </form>
+      <button id="registerAckBtn" class="text-btn auth-register-btn" type="button">ลงทะเบียนครั้งแรกสำหรับรับทราบ OT</button>
       <p id="loginError" class="error-text" hidden></p>
     </section>
   </main>
@@ -190,6 +191,21 @@
             <div class="table-wrap"><table id="summaryTable"></table></div>
           </section>
 
+          <section id="ackManagerCard" class="card ack-manager-card" hidden>
+            <div class="section-head">
+              <div>
+                <h2>รับทราบ OT <span id="ackProgressBadge" class="pill">0 / 0 คน</span></h2>
+              </div>
+              <div class="actions">
+                <button id="refreshAckBtn" class="secondary-btn" type="button">รีเฟรช</button>
+                <button id="exportAckEvidenceBtn" class="secondary-btn" type="button" disabled>Export หลักฐาน</button>
+                <button id="saveAckEmailsBtn" class="primary-btn" type="button">บันทึก Mahidol ID</button>
+              </div>
+            </div>
+            <p id="ackManagerNote" class="notice-inline" hidden></p>
+            <div class="table-wrap"><table id="ackManagerTable"></table></div>
+          </section>
+
           <section class="card">
             <div class="section-head"><div><h2>สรุปตามหน่วย</h2></div></div>
             <div class="table-wrap"><table id="unitSummaryTable"></table></div>
@@ -232,7 +248,7 @@
             <li><b>กด “ดึงวันลา”</b><span>หลังดึงแล้ว ดูหัวข้อ “วันลาทั้งหมดที่ดึงมา” เพื่อตรวจว่ารายการเข้ามาครบ</span></li>
             <li><b>ตรวจรายการที่ระบบเตือน</b><span>ถ้ามีคนติดวันลา ให้เช็กว่าเปลี่ยนเวรหรือมาทำงานจริงก่อน</span></li>
             <li><b>กด “ยืนยันและบันทึกรอบนี้”</b><span>เมื่อข้อมูลถูกต้องแล้ว ให้บันทึกรอบไว้</span></li>
-            <li><b>กด “Export HR Excel”</b><span>ระบบจะจัดรายการสำหรับ HR ให้พร้อม รวมสิทธิ์ 00000328 ถ้ามี</span></li>
+            <li><b>ให้เจ้าหน้าที่รับทราบ</b><span>ใส่ Mahidol ID ของแต่ละคนครั้งแรก แล้วติดตามสถานะในหัวข้อ “รับทราบ OT”</span></li><li><b>กด “Export HR Excel”</b><span>ระบบจะจัดรายการสำหรับ HR ให้พร้อม รวมสิทธิ์ 00000328 ถ้ามี</span></li>
           </ol>
           <div class="simple-note"><b>ถ้าไฟล์ไม่ตรงรอบหรือข้อมูลผิด</b><span>ดูคำเตือนในหน้า “ทำ OT รอบนี้” แล้วแก้ไฟล์ก่อน Export</span></div>
         </section>
@@ -254,7 +270,26 @@
     };
     window.PSC_OT_CONFIG = window.LAB_OT_CONFIG;
   </script>
-  <script src="app.js?v=20260903-15"></script>
+  <script src="app.js?v=20260903-16"></script>
+
+
+  <main id="ackView" class="ack-view" hidden>
+    <header class="topbar ack-topbar">
+      <div>
+        <div class="eyebrow">LAB OT</div>
+        <h1>รับทราบ OT</h1>
+      </div>
+      <div class="topbar-actions">
+        <span id="ackLoginBadge" class="user-badge"></span>
+        <button id="ackChangePasswordBtn" class="ghost-btn" type="button">เปลี่ยนรหัสผ่าน</button>
+        <button id="ackLogoutBtn" class="ghost-btn" type="button">ออกจากระบบ</button>
+      </div>
+    </header>
+    <main class="ack-page-shell">
+      <div id="ackEmpty" class="empty-state">กำลังโหลดรายการ…</div>
+      <section id="ackList" class="ack-list"></section>
+    </main>
+  </main>
 
   <div id="passwordModal" class="modal-backdrop" hidden>
     <section class="modal-card password-modal" role="dialog" aria-modal="true" aria-labelledby="passwordModalTitle">

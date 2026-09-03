@@ -39,7 +39,11 @@
     history: [],
     hrExport: null,
     special328Dates: [],
-    special328Selected: {}
+    special328Selected: {},
+    ackPeople: {},
+    ackRows: [],
+    ackDbReady: true,
+    ackPerson: null
   };
 
   const $ = id => document.getElementById(id);
@@ -73,7 +77,7 @@
   }
 
   function showOnly(id) {
-    ['setupView','authView','appView'].forEach(x => { $(x).hidden = x !== id; });
+    ['setupView','authView','appView','ackView'].forEach(x => { $(x).hidden = x !== id; });
   }
 
   function getCurrentCycle() {
@@ -130,7 +134,7 @@
       }
       $('calendarSyncMeta').hidden = true;
       recompute();
-      if (state.sb && !state.offline) loadSpecial328Settings();
+      if (state.sb && !state.offline) { loadSpecial328Settings(); loadAckManagerData(); }
     }
   }
 
@@ -212,19 +216,57 @@
   async function acceptSession(session) {
     const email = String(session?.user?.email || '').trim().toLowerCase();
     const info = normalizedUsers[email];
-    if (!info) {
-      await state.sb.auth.signOut();
-      $('loginError').textContent = 'บัญชีนี้ไม่ได้รับอนุญาตให้ใช้ระบบ'; $('loginError').hidden = false; showOnly('authView'); return;
-    }
+
     state.session = session;
-    state.actualRole = info.role;
-    state.role = info.role; // สิทธิ์จริง ใช้กับการทำงานระบบ
     state.offline = false;
-    $('loginBadge').textContent = `${info.role === 'admin' ? 'Admin' : 'Staff'} · ${email}`;
-    showOnly('appView');
-    const savedView = info.role === 'admin' ? sessionStorage.getItem('labot_view_role') : 'staff';
-    applyViewRole(savedView === 'staff' ? 'staff' : info.role, {persist:false});
-    await Promise.all([loadHistory(), loadSpecial328Settings()]);
+
+    // Admin / Staff ผู้ทำรอบ OT
+    if (info) {
+      state.actualRole = info.role;
+      state.role = info.role;
+      state.ackPerson = null;
+      $('loginBadge').textContent = `${info.role === 'admin' ? 'Admin' : 'Staff'} · ${email}`;
+      showOnly('appView');
+      const savedView = info.role === 'admin' ? sessionStorage.getItem('labot_view_role') : 'staff';
+      applyViewRole(savedView === 'staff' ? 'staff' : info.role, {persist:false});
+      await Promise.all([loadHistory(), loadSpecial328Settings(), loadAckManagerData()]);
+      return;
+    }
+
+    // เจ้าหน้าที่ทั่วไป: เข้าได้เฉพาะเมื่อ Staff/Admin ผูก Mahidol ID กับรายชื่อไว้แล้ว
+    try {
+      const { data: person, error } = await state.sb
+        .from('ot_ack_people')
+        .select('staff_key,employee_code,display_name,email,active')
+        .eq('email', email)
+        .eq('active', true)
+        .maybeSingle();
+
+      if (error) throw error;
+      if (!person) {
+        await state.sb.auth.signOut();
+        $('loginError').textContent = 'บัญชีนี้ยังไม่ได้ถูกเพิ่มในรายชื่อรับทราบ OT กรุณาแจ้งผู้จัดทำ OT';
+        $('loginError').hidden = false;
+        showOnly('authView');
+        return;
+      }
+
+      state.actualRole = 'ack';
+      state.role = 'ack';
+      state.viewRole = 'ack';
+      state.ackPerson = person;
+      $('ackLoginBadge').textContent = `${person.display_name} · ${email}`;
+      showOnly('ackView');
+      await loadAckPortal();
+    } catch (err) {
+      console.error('ack role lookup failed', err);
+      await state.sb.auth.signOut();
+      $('loginError').textContent = String(err?.message || '').includes('ot_ack_people')
+        ? 'ยังไม่ได้ติดตั้งฐานข้อมูลรับทราบ OT'
+        : 'เปิดรายการรับทราบไม่สำเร็จ';
+      $('loginError').hidden = false;
+      showOnly('authView');
+    }
   }
 
   function enterOffline() {
@@ -240,9 +282,59 @@
     if (!email.endsWith('@mahidol.ac.th')) {
       $('loginError').textContent='ระบบนี้ใช้บัญชี @mahidol.ac.th เท่านั้น'; $('loginError').hidden=false; return;
     }
-    if (!normalizedUsers[email]) { $('loginError').textContent='บัญชีนี้ไม่ได้รับอนุญาตให้ใช้ระบบ'; $('loginError').hidden=false; return; }
     const { error } = await state.sb.auth.signInWithPassword({ email, password });
     if (error) { $('loginError').textContent = error.message || 'เข้าสู่ระบบไม่สำเร็จ'; $('loginError').hidden=false; }
+  }
+
+
+  async function registerAckAccount() {
+    $('loginError').hidden = true;
+    const email = normalizeMahidolEmail($('emailInput').value);
+    const password = String($('passwordInput').value || '');
+
+    if (!email.endsWith('@mahidol.ac.th')) {
+      $('loginError').textContent='กรุณาใช้บัญชี @mahidol.ac.th';
+      $('loginError').hidden=false;
+      return;
+    }
+    if (password.length < 8) {
+      $('loginError').textContent='ตั้งรหัสผ่านอย่างน้อย 8 ตัวอักษร';
+      $('loginError').hidden=false;
+      return;
+    }
+
+    try {
+      const { data: allowed, error: checkError } = await state.sb.rpc('can_register_ot_ack', { p_email: email });
+      if (checkError) throw checkError;
+      if (!allowed) {
+        $('loginError').textContent='Mahidol ID นี้ยังไม่ได้ถูกผูกกับรายชื่อรับทราบ OT กรุณาแจ้งผู้จัดทำ OT';
+        $('loginError').hidden=false;
+        return;
+      }
+
+      const { data, error } = await state.sb.auth.signUp({ email, password });
+      if (error) throw error;
+
+      if (data?.user && Array.isArray(data.user.identities) && data.user.identities.length === 0) {
+        $('loginError').textContent='บัญชีนี้เคยลงทะเบียนแล้ว ให้ใช้ปุ่ม “เข้าสู่ระบบ”';
+        $('loginError').hidden=false;
+        return;
+      }
+
+      if (data?.session) {
+        await acceptSession(data.session);
+      } else {
+        $('loginError').textContent='ลงทะเบียนแล้ว กรุณาตรวจอีเมล Mahidol เพื่อยืนยันบัญชี แล้วกลับมาเข้าสู่ระบบ';
+        $('loginError').hidden=false;
+        $('loginError').classList.add('success-message');
+      }
+    } catch (err) {
+      console.error('ack registration failed', err);
+      $('loginError').textContent = String(err?.message || '').includes('can_register_ot_ack')
+        ? 'กรุณาให้ Admin ติดตั้งระบบรับทราบ OT ใน Supabase ก่อน'
+        : (err?.message || 'ลงทะเบียนไม่สำเร็จ');
+      $('loginError').hidden=false;
+    }
   }
 
 
@@ -327,6 +419,16 @@
 
   function bindUI() {
     $('loginForm').addEventListener('submit', login);
+    $('registerAckBtn')?.addEventListener('click', registerAckAccount);
+    $('ackLogoutBtn')?.addEventListener('click', logout);
+    $('ackChangePasswordBtn')?.addEventListener('click', openPasswordModal);
+    $('saveAckEmailsBtn')?.addEventListener('click', saveAckMappings);
+    $('exportAckEvidenceBtn')?.addEventListener('click', exportAckEvidence);
+    $('refreshAckBtn')?.addEventListener('click', loadAckManagerData);
+    $('ackList')?.addEventListener('click', e => {
+      const btn=e.target.closest('[data-ack-cycle]');
+      if(btn) acknowledgeOwnCycle(btn.dataset.ackCycle);
+    });
     $('logoutBtn').addEventListener('click', logout);
     $('changePasswordBtn')?.addEventListener('click', openPasswordModal);
     $('closePasswordModalBtn')?.addEventListener('click', closePasswordModal);
@@ -605,7 +707,7 @@
     $('assignmentMetric').textContent = assignments.length.toLocaleString('th-TH');
     $('hoursMetric').textContent = `${assignments.reduce((s,x)=>s+x.hours,0).toLocaleString('th-TH')} ชม.`;
     $('conflictMetric').textContent = state.conflicts.length.toLocaleString('th-TH');
-    renderValidation(); renderSummary(summary); renderUnitSummary(unitSummary); renderConflicts(); renderAllLeaves(); renderSpecial328Eligibility();
+    renderValidation(); renderSummary(summary); renderUnitSummary(unitSummary); renderConflicts(); renderAllLeaves(); renderSpecial328Eligibility(); renderAckManager();
     $('exportBtn').disabled = !unitsReady();
     $('saveBtn').disabled = state.offline || !unitsReady() || !state.calendarSyncedAt;
   }
@@ -735,6 +837,366 @@
        (typically New Year / Songkran), configured by Admin.
      - Excel "*" NEVER implies 160; it only affects roster hours.
      =========================== */
+
+  /* ===========================
+     OT ACKNOWLEDGEMENT
+     =========================== */
+  function staffIdentity(name) {
+    const hr = typeof hrStaff === 'function' ? hrStaff(name) : null;
+    const employeeCode = hr?.employeeCode || '';
+    const staffKey = employeeCode ? `emp:${employeeCode}` : `name:${normName(name)}`;
+    return {
+      staffKey,
+      employeeCode,
+      displayName: hr?.fullName || String(name || '').trim(),
+      shortName: String(name || '').trim()
+    };
+  }
+
+  function ackEmailValue(v) {
+    const raw=String(v||'').trim().toLowerCase();
+    if (!raw) return '';
+    return normalizeMahidolEmail(raw);
+  }
+
+  function currentCycleKey() {
+    return `${state.cycle.start}_${state.cycle.end}`;
+  }
+
+  function ackManagerSummary() {
+    return buildSummary(allAssignments()).map(r => ({ ...r, identity:staffIdentity(r.name) }));
+  }
+
+  function ackDetailFor(summaryRow) {
+    const key=normName(summaryRow.name);
+    const assignments=allAssignments()
+      .filter(a=>normName(a.name)===key)
+      .sort((a,b)=>a.date.localeCompare(b.date)||a.unit.localeCompare(b.unit)||a.duty.localeCompare(b.duty))
+      .map(a=>({
+        date:a.date,unit:a.unit,duty:a.duty,time:a.timeLabel,hours:a.hours
+      }));
+
+    const special = buildSpecial328Eligibility(allAssignments())
+      .find(x=>x.employeeCode && x.employeeCode===summaryRow.identity.employeeCode);
+    const specialCount = special?.selected ? Number(special.units||0) : 0;
+
+    return {
+      cycle:{start:state.cycle.start,end:state.cycle.end},
+      name:summaryRow.identity.displayName,
+      employeeCode:summaryRow.identity.employeeCode,
+      unitHours:{LAB:summaryRow.LAB||0,Molec:summaryRow.Molec||0,Bacteria:summaryRow.Bacteria||0},
+      totalHours:summaryRow.hours||0,
+      assignmentCount:summaryRow.count||0,
+      special328Count:specialCount,
+      special328Amount:specialCount*240,
+      assignments
+    };
+  }
+
+  async function sha256Hex(value) {
+    const bytes=new TextEncoder().encode(String(value));
+    const digest=await crypto.subtle.digest('SHA-256',bytes);
+    return [...new Uint8Array(digest)].map(b=>b.toString(16).padStart(2,'0')).join('');
+  }
+
+  async function loadAckManagerData() {
+    if (state.offline || !state.sb || !['admin','staff'].includes(state.actualRole)) return;
+    state.ackDbReady=true;
+    try {
+      const cycleKey=currentCycleKey();
+      const [{data:people,error:peopleError},{data:rows,error:rowsError}] = await Promise.all([
+        state.sb.from('ot_ack_people').select('staff_key,employee_code,display_name,email,active,updated_at').eq('active',true),
+        state.sb.from('ot_acknowledgements').select('*').eq('cycle_key',cycleKey)
+      ]);
+      if (peopleError) throw peopleError;
+      if (rowsError) throw rowsError;
+
+      state.ackPeople=Object.fromEntries((people||[]).map(p=>[p.staff_key,p]));
+      state.ackRows=rows||[];
+      renderAckManager();
+    } catch(err) {
+      console.warn('load acknowledgement manager data',err);
+      state.ackDbReady=false;
+      state.ackPeople={};
+      state.ackRows=[];
+      renderAckManager();
+    }
+  }
+
+  function renderAckManager() {
+    const card=$('ackManagerCard'), table=$('ackManagerTable'), badge=$('ackProgressBadge');
+    const note=$('ackManagerNote');
+    if (!card || !table || !badge) return;
+
+    const summary=ackManagerSummary();
+    card.hidden=!summary.length;
+    if (!summary.length) return;
+
+    if (!state.ackDbReady) {
+      badge.textContent='ยังไม่พร้อม';
+      table.innerHTML='';
+      if(note){note.hidden=false;note.textContent='ต้องติดตั้ง SQL ระบบรับทราบใน Supabase ครั้งเดียวก่อนใช้งานส่วนนี้';}
+      $('saveAckEmailsBtn').disabled=true;
+      $('exportAckEvidenceBtn').disabled=true;
+      return;
+    }
+
+    if(note) note.hidden=true;
+    $('saveAckEmailsBtn').disabled=false;
+
+    const ackMap=new Map((state.ackRows||[]).map(x=>[x.staff_key,x]));
+    const acknowledged=summary.filter(r=>ackMap.get(r.identity.staffKey)?.status==='acknowledged').length;
+    badge.textContent=`${acknowledged} / ${summary.length} คน`;
+    badge.className=`pill ${acknowledged===summary.length&&summary.length?'good':''}`;
+    $('exportAckEvidenceBtn').disabled=!state.snapshotAt;
+
+    table.innerHTML=`<thead><tr>
+      <th>ชื่อ</th>
+      <th class="num">OT</th>
+      <th>Mahidol ID</th>
+      <th>สถานะ</th>
+    </tr></thead><tbody>${summary.map(r=>{
+      const id=r.identity;
+      const person=state.ackPeople[id.staffKey]||{};
+      const ack=ackMap.get(id.staffKey);
+      const username=String(person.email||'').replace(/@mahidol\.ac\.th$/i,'');
+      let status='';
+      if(!state.snapshotAt) status='<span class="ack-status neutral">บันทึกรอบก่อน</span>';
+      else if(!person.email) status='<span class="ack-status neutral">ยังไม่ได้ใส่ Mahidol ID</span>';
+      else if(ack?.status==='acknowledged') status=`<span class="ack-status done">✓ รับทราบแล้ว</span><div class="ack-time">${esc(fmtDateTimeThai(ack.acknowledged_at))}</div>`;
+      else status='<span class="ack-status pending">รอรับทราบ</span>';
+      return `<tr>
+        <td><b>${esc(id.displayName)}</b>${id.employeeCode?`<div class="subtle">${esc(id.employeeCode)}</div>`:''}</td>
+        <td class="num"><b>${r.hours}</b> ชม.</td>
+        <td>
+          <span class="ack-email-field">
+            <input type="text" data-ack-email="${esc(id.staffKey)}" data-ack-name="${esc(id.displayName)}"
+              data-ack-employee="${esc(id.employeeCode)}" value="${esc(username)}"
+              placeholder="name.surname" autocapitalize="none" spellcheck="false">
+            <span>@mahidol.ac.th</span>
+          </span>
+        </td>
+        <td>${status}</td>
+      </tr>`;
+    }).join('')}</tbody>`;
+  }
+
+  async function saveAckMappings() {
+    if (state.offline || !state.sb || !['admin','staff'].includes(state.actualRole)) return;
+    if (!state.ackDbReady) return toast('ยังไม่ได้ติดตั้งฐานข้อมูลรับทราบ OT');
+
+    const inputs=[...document.querySelectorAll('[data-ack-email]')];
+    const seen=new Set(), upserts=[], deletes=[];
+    for(const input of inputs){
+      const staffKey=input.dataset.ackEmail;
+      const displayName=input.dataset.ackName||'';
+      const employeeCode=input.dataset.ackEmployee||'';
+      const email=ackEmailValue(input.value);
+
+      if(email && !email.endsWith('@mahidol.ac.th')) return toast(`Mahidol ID ของ ${displayName} ไม่ถูกต้อง`);
+      if(email){
+        if(seen.has(email)) return toast(`มี Mahidol ID ซ้ำ: ${email}`);
+        seen.add(email);
+        upserts.push({
+          staff_key:staffKey,
+          employee_code:employeeCode||null,
+          display_name:displayName,
+          email,
+          active:true,
+          updated_at:new Date().toISOString(),
+          updated_by:String(state.session?.user?.email||'')
+        });
+      }else if(state.ackPeople[staffKey]){
+        deletes.push(staffKey);
+      }
+    }
+
+    try{
+      if(upserts.length){
+        const {error}=await state.sb.from('ot_ack_people').upsert(upserts,{onConflict:'staff_key'});
+        if(error) throw error;
+      }
+      if(deletes.length){
+        const {error}=await state.sb.from('ot_ack_people').delete().in('staff_key',deletes);
+        if(error) throw error;
+      }
+      await loadAckManagerData();
+      if(state.snapshotAt) await syncAckRequests();
+      toast('บันทึก Mahidol ID แล้ว');
+    }catch(err){
+      console.error('save ack mappings',err);
+      toast(`บันทึก Mahidol ID ไม่สำเร็จ: ${err.message||err}`);
+    }
+  }
+
+  async function syncAckRequests() {
+    if (state.offline || !state.sb || !state.snapshotAt || !unitsReady()) return;
+    if (!['admin','staff'].includes(state.actualRole)) return;
+
+    const summary=ackManagerSummary();
+    if(!summary.length) return;
+
+    const cycleKey=currentCycleKey();
+    const {data:existing,error:readError}=await state.sb.from('ot_acknowledgements').select('*').eq('cycle_key',cycleKey);
+    if(readError) throw readError;
+    const existingMap=new Map((existing||[]).map(x=>[x.staff_key,x]));
+    const now=new Date().toISOString();
+    const rows=[];
+
+    for(const r of summary){
+      const id=r.identity;
+      const person=state.ackPeople[id.staffKey]||{};
+      const email=String(person.email||'').trim().toLowerCase()||null;
+      const detail=ackDetailFor(r);
+      const hash=await sha256Hex(JSON.stringify(detail));
+      const old=existingMap.get(id.staffKey);
+      const unchanged=!!old && old.detail_hash===hash && String(old.email||'')===String(email||'');
+      const keepAck=unchanged && old.status==='acknowledged';
+
+      rows.push({
+        cycle_key:cycleKey,
+        cycle_start:state.cycle.start,
+        cycle_end:state.cycle.end,
+        staff_key:id.staffKey,
+        employee_code:id.employeeCode||null,
+        display_name:id.displayName,
+        email,
+        ot_hours:r.hours||0,
+        detail_hash:hash,
+        detail_json:detail,
+        status:email ? (keepAck?'acknowledged':'pending') : 'unassigned',
+        acknowledged_at:keepAck?old.acknowledged_at:null,
+        acknowledged_by:keepAck?old.acknowledged_by:null,
+        updated_at:now
+      });
+    }
+
+    const {error}=await state.sb.from('ot_acknowledgements').upsert(rows,{onConflict:'cycle_key,staff_key'});
+    if(error) throw error;
+
+    const currentKeys=new Set(rows.map(x=>x.staff_key));
+    const stale=(existing||[]).filter(x=>!currentKeys.has(x.staff_key)).map(x=>x.staff_key);
+    if(stale.length){
+      const {error:delError}=await state.sb.from('ot_acknowledgements')
+        .delete().eq('cycle_key',cycleKey).in('staff_key',stale);
+      if(delError) throw delError;
+    }
+    await loadAckManagerData();
+  }
+
+  async function exportAckEvidence() {
+    if(!state.snapshotAt) return toast('กรุณาบันทึกรอบก่อน');
+    try{
+      await loadAckManagerData();
+      const summary=ackManagerSummary();
+      const ackMap=new Map((state.ackRows||[]).map(x=>[x.staff_key,x]));
+      const rows=summary.map((r,i)=>{
+        const id=r.identity, a=ackMap.get(id.staffKey)||{}, p=state.ackPeople[id.staffKey]||{};
+        return {
+          'ลำดับ':i+1,
+          'รอบ OT':fmtThaiRange(state.cycle.start,state.cycle.end),
+          'ID':id.employeeCode||'',
+          'ชื่อ-สกุล':id.displayName,
+          'Mahidol ID':p.email||a.email||'',
+          'OT รวม (ชม.)':r.hours,
+          'สถานะ':a.status==='acknowledged'?'รับทราบแล้ว':(p.email?'รอรับทราบ':'ยังไม่ได้ใส่ Mahidol ID'),
+          'รับทราบเมื่อ':a.acknowledged_at?fmtDateTimeThai(a.acknowledged_at):'',
+          'บัญชีผู้ยืนยัน':a.acknowledged_by||''
+        };
+      });
+      const wb=XLSX.utils.book_new();
+      const ws=XLSX.utils.json_to_sheet(rows);
+      ws['!cols']=[{wch:8},{wch:28},{wch:12},{wch:32},{wch:34},{wch:14},{wch:20},{wch:24},{wch:34}];
+      XLSX.utils.book_append_sheet(wb,ws,'หลักฐานรับทราบ OT');
+      const stamp=currentCycleKey().replaceAll('-','');
+      XLSX.writeFile(wb,`OT_ACK_${stamp}.xlsx`);
+      toast('Export หลักฐานการรับทราบแล้ว');
+    }catch(err){
+      console.error('export ack evidence',err);
+      toast(`Export ไม่สำเร็จ: ${err.message||err}`);
+    }
+  }
+
+  async function loadAckPortal() {
+    const list=$('ackList'), empty=$('ackEmpty');
+    if(!list||!empty||!state.session?.user?.email) return;
+    const email=String(state.session.user.email).toLowerCase();
+
+    const {data,error}=await state.sb.from('ot_acknowledgements')
+      .select('*').eq('email',email).order('cycle_start',{ascending:false});
+
+    if(error){
+      empty.hidden=false; empty.textContent=`เปิดรายการไม่ได้: ${error.message}`; list.innerHTML=''; return;
+    }
+    const rows=data||[];
+    if(!rows.length){
+      empty.hidden=false; empty.textContent='ยังไม่มีรายการ OT ที่ส่งมาให้รับทราบ'; list.innerHTML=''; return;
+    }
+    empty.hidden=true;
+    list.innerHTML=rows.map(r=>{
+      const d=r.detail_json||{};
+      const assignments=Array.isArray(d.assignments)?d.assignments:[];
+      const acknowledged=r.status==='acknowledged';
+      const specialCount=Number(d.special328Count||0);
+      return `<article class="ack-person-card">
+        <div class="ack-person-head">
+          <div>
+            <div class="section-kicker">รอบ OT</div>
+            <h2>${esc(fmtThaiRange(r.cycle_start,r.cycle_end))}</h2>
+          </div>
+          ${acknowledged
+            ? `<span class="ack-status done">✓ รับทราบแล้ว</span>`
+            : `<span class="ack-status pending">รอรับทราบ</span>`}
+        </div>
+        <div class="ack-metrics">
+          <div><span>OT รวม</span><b>${Number(r.ot_hours||0).toLocaleString('th-TH')} ชม.</b></div>
+          <div><span>LAB</span><b>${Number(d.unitHours?.LAB||0)}</b></div>
+          <div><span>Molec</span><b>${Number(d.unitHours?.Molec||0)}</b></div>
+          <div><span>Bacteria</span><b>${Number(d.unitHours?.Bacteria||0)}</b></div>
+          ${specialCount?`<div><span>00000328</span><b>${specialCount} ครั้ง</b></div>`:''}
+        </div>
+
+        <details class="ack-details">
+          <summary>ดูรายละเอียดเวร ${assignments.length} รายการ</summary>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>วันที่</th><th>หน่วย</th><th>เวร</th><th>เวลา</th><th class="num">ชม.</th></tr></thead>
+              <tbody>${assignments.map(a=>`<tr>
+                <td>${esc(fmtThaiDate(a.date))}</td><td>${esc(a.unit)}</td><td>${esc(a.duty)}</td>
+                <td>${esc(a.time)}</td><td class="num">${Number(a.hours||0)}</td>
+              </tr>`).join('')}</tbody>
+            </table>
+          </div>
+        </details>
+
+        ${acknowledged
+          ? `<div class="ack-confirmed">รับทราบเมื่อ ${esc(fmtDateTimeThai(r.acknowledged_at))}<br><span>${esc(r.acknowledged_by||'')}</span></div>`
+          : `<label class="ack-check">
+              <input type="checkbox" id="ackCheck_${esc(r.cycle_key)}">
+              <span>ข้าพเจ้าได้ตรวจสอบและรับทราบรายการ OT ของตนเองแล้ว</span>
+            </label>
+            <button class="primary-btn ack-submit-btn" type="button" data-ack-cycle="${esc(r.cycle_key)}">ยืนยันรับทราบ</button>`}
+      </article>`;
+    }).join('');
+  }
+
+  async function acknowledgeOwnCycle(cycleKey) {
+    const check=$(`ackCheck_${cycleKey}`);
+    if(!check?.checked) return toast('กรุณาติ๊กยืนยันว่าตรวจสอบรายการแล้ว');
+    const btn=document.querySelector(`[data-ack-cycle="${CSS.escape(cycleKey)}"]`);
+    if(btn){btn.disabled=true;btn.textContent='กำลังบันทึก…';}
+    try{
+      const {data,error}=await state.sb.rpc('acknowledge_ot',{p_cycle_key:cycleKey});
+      if(error) throw error;
+      toast('บันทึกรับทราบเรียบร้อยแล้ว');
+      await loadAckPortal();
+    }catch(err){
+      console.error('acknowledge OT',err);
+      toast(`บันทึกรับทราบไม่สำเร็จ: ${err.message||err}`);
+      if(btn){btn.disabled=false;btn.textContent='ยืนยันรับทราบ';}
+    }
+  }
+
   /* ===========================
      HR SPECIAL BENEFIT 00000328
      - 240 THB per 8-hour occurrence.
@@ -1444,6 +1906,12 @@
       }, { onConflict:'cycle_key' });
       if (error) throw error;
       state.snapshotAt=now; state.loadedSnapshot=true;
+      try {
+        await loadAckManagerData();
+        await syncAckRequests();
+      } catch (ackErr) {
+        console.warn('prepare acknowledgements failed', ackErr);
+      }
       toast('บันทึกรอบนี้แล้ว'); await loadHistory();
     } catch(err) { console.error(err); toast(`บันทึกไม่สำเร็จ: ${err.message || err}`); }
     finally { recompute(); }
@@ -1481,7 +1949,7 @@
     }
     $('calendarStatus').className='file-status ok'; $('calendarStatus').textContent=`✓ ใช้วันลาที่บันทึกไว้กับรอบนี้`;
     $('calendarSyncMeta').hidden=false; $('calendarSyncMeta').innerHTML=`<b>บันทึกรอบ:</b> ${esc(fmtDateTimeThai(state.snapshotAt))}<br><b>วันลาที่ใช้:</b> ${esc(fmtDateTimeThai(state.calendarSyncedAt))}`;
-    recompute(); switchTab('work'); toast('เปิดรอบที่บันทึกไว้แล้ว');
+    recompute(); await loadAckManagerData(); switchTab('work'); toast('เปิดรอบที่บันทึกไว้แล้ว');
   }
 
   init().catch(err => { console.error(err); alert(err.message || err); });
