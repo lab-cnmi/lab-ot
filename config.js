@@ -1,14 +1,12 @@
-window.LAB_OT_CONFIG = {
-  // Supabase Project URL + Publishable key
+window.PSC_OT_CONFIG = {
   SUPABASE_URL: 'https://xjbwuyhdpsmfimzaradu.supabase.co',
   SUPABASE_KEY: 'sb_publishable_yyLkUtatgoov6hR50VeLHQ_P8WGFZ-G',
 
-  // บัญชีที่อนุญาตให้เข้าแอป
   USERS: {
     'parichat.ink@mahidol.ac.th': { role: 'admin', label: 'Admin' },
     'paleerat.ran@mahidol.ac.th': { role: 'staff', label: 'Staff' }
   }
 };
 
-// compatibility เผื่อไฟล์เก่าบางส่วนยังอ้างชื่อเดิม
-window.PSC_OT_CONFIG = window.LAB_OT_CONFIG;
+// Compatibility alias: รองรับทั้งโค้ดชื่อเดิมและชื่อใหม่
+window.LAB_OT_CONFIG = window.PSC_OT_CONFIG;
