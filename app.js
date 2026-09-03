@@ -497,7 +497,7 @@
     $('assignmentMetric').textContent = assignments.length.toLocaleString('th-TH');
     $('hoursMetric').textContent = `${assignments.reduce((s,x)=>s+x.hours,0).toLocaleString('th-TH')} ชม.`;
     $('conflictMetric').textContent = state.conflicts.length.toLocaleString('th-TH');
-    renderValidation(); renderSummary(summary); renderUnitSummary(unitSummary); renderConflicts(); renderSpecial328Eligibility();
+    renderValidation(); renderSummary(summary); renderUnitSummary(unitSummary); renderConflicts(); renderAllLeaves(); renderSpecial328Eligibility();
     $('exportBtn').disabled = !unitsReady();
     $('saveBtn').disabled = state.offline || !unitsReady() || !state.calendarSyncedAt;
   }
@@ -531,6 +531,73 @@
     $('conflictTable').innerHTML=`<thead><tr><th>วันที่ OT</th><th>ชื่อ</th><th>หน่วย</th><th>เวร</th><th>เวลา</th><th class="num">ชม.</th><th>Calendar</th><th>รายการใน Calendar</th></tr></thead><tbody>${state.conflicts.map(x=>`<tr><td>${esc(fmtThaiDate(x.date))}</td><td><b>${esc(x.name)}</b></td><td>${esc(x.unit)}</td><td>${esc(x.duty)}</td><td>${esc(x.timeLabel)}</td><td class="num">${x.hours}</td><td>${esc(x.calendar)}</td><td>${esc(x.summary)}</td></tr>`).join('')}</tbody>`;
   }
 
+
+  function renderAllLeaves() {
+    const badge=$('leaveCountBadge'), sourceSummary=$('leaveSourceSummary');
+    const empty=$('allLeaveEmpty'), table=$('allLeaveTable');
+    if (!badge || !sourceSummary || !empty || !table) return;
+
+    const events=[...(state.leaveEvents||[])].filter(ev=>ev.start&&ev.end)
+      .sort((a,b)=>String(a.start).localeCompare(String(b.start))||String(a.summary||'').localeCompare(String(b.summary||''),'th'));
+
+    badge.textContent=events.length.toLocaleString('th-TH');
+
+    const sourceCounts=new Map();
+    events.forEach(ev=>{
+      const key=String(ev.source||'Calendar');
+      sourceCounts.set(key,(sourceCounts.get(key)||0)+1);
+    });
+    sourceSummary.textContent=events.length
+      ? [...sourceCounts.entries()].map(([name,count])=>`${name} ${count}`).join(' · ')
+      : '';
+
+    if (!state.calendarSyncedAt) {
+      empty.hidden=false;
+      empty.textContent='ยังไม่ได้ดึงวันลา';
+      table.innerHTML='';
+      return;
+    }
+    if (!events.length) {
+      empty.hidden=false;
+      empty.textContent='ไม่พบวันลาในรอบนี้';
+      table.innerHTML='';
+      return;
+    }
+
+    const conflictCountForEvent=(ev)=>{
+      return (state.conflicts||[]).filter(c=>{
+        if (ev.uid && c.uid) return c.uid===ev.uid && c.calendar===ev.source;
+        return c.calendar===ev.source &&
+          c.leaveStart===ev.start &&
+          c.leaveEnd===ev.end &&
+          c.summary===ev.summary;
+      }).length;
+    };
+    const leaveRange=(ev)=>{
+      if (ev.start===ev.end) return fmtThaiDate(ev.start);
+      return `${fmtThaiDate(ev.start)} – ${fmtThaiDate(ev.end)}`;
+    };
+
+    empty.hidden=true;
+    table.innerHTML=`<thead><tr>
+      <th>วันลา</th>
+      <th>รายการ</th>
+      <th>Calendar</th>
+      <th>ตรวจเทียบเวร</th>
+    </tr></thead><tbody>${events.map(ev=>{
+      const hits=conflictCountForEvent(ev);
+      return `<tr>
+        <td><b>${esc(leaveRange(ev))}</b></td>
+        <td>${esc(ev.summary||'-')}</td>
+        <td>${esc(ev.source||'-')}</td>
+        <td>${hits
+          ? `<span class="leave-match warn">ตรงกับเวร ${hits} รายการ</span>`
+          : `<span class="leave-match ok">ไม่ตรงกับเวร</span>`}
+        </td>
+      </tr>`;
+    }).join('')}</tbody>`;
+  }
+
   async function syncCalendar() {
     if (!unitsReady()) return toast('กรุณาอัปตารางเวรให้ครบ 3 หน่วยก่อน');
     if (state.offline || !state.sb) return toast('โหมดทดลองไม่เชื่อม Calendar');
@@ -542,9 +609,9 @@
       state.calendarSources = data.sources || [];
       state.leaveEvents = state.calendarSources.flatMap(src => (src.events||[]).map(ev => ({...ev, source:src.name}))).filter(ev => ev.start && ev.end);
       state.calendarSyncedAt = data.synced_at || new Date().toISOString(); state.loadedSnapshot=false; state.hrExport=null;
-      $('calendarStatus').className='file-status ok'; $('calendarStatus').textContent=`✓ ดึง ${state.calendarSources.length} Calendar · ${state.leaveEvents.length} รายการในรอบ`;
+      $('calendarStatus').className='file-status ok'; $('calendarStatus').textContent=`✓ ดึงวันลาแล้ว ${state.leaveEvents.length} รายการ`;
       $('calendarSyncMeta').hidden=false;
-      $('calendarSyncMeta').innerHTML=`<b>อัปเดตล่าสุด:</b> ${esc(fmtDateTimeThai(state.calendarSyncedAt))}<br><b>Calendar:</b> ${esc(state.calendarSources.map(x=>x.name).join(' · '))}`;
+      $('calendarSyncMeta').innerHTML=`<b>อัปเดต:</b> ${esc(fmtDateTimeThai(state.calendarSyncedAt))}`;
       recompute(); toast('ดึงวันลาล่าสุดแล้ว');
     } catch (err) {
       console.error(err); $('calendarStatus').className='file-status error'; $('calendarStatus').textContent=`ดึงวันลาไม่สำเร็จ: ${err.message || err}`; toast('ดึงวันลาไม่สำเร็จ');

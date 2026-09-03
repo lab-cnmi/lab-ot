@@ -261,3 +261,45 @@ td{line-height:1.45}
   .view-mode-btn{max-width:145px}
   .staff-preview-banner{margin:8px 10px 0}
 }
+
+
+/* V2.8 — all imported leave events */
+.count-badge{
+  display:inline-flex;
+  align-items:center;
+  gap:4px;
+  margin-left:8px;
+  padding:4px 9px;
+  border-radius:999px;
+  background:#edf5f9;
+  color:#3f6c83;
+  font-size:12px;
+  font-weight:600;
+  vertical-align:middle;
+}
+.leave-source-summary{
+  margin:4px 0 0 !important;
+  color:#718494 !important;
+}
+.leave-match{
+  display:inline-flex;
+  padding:4px 8px;
+  border-radius:999px;
+  font-size:12px;
+  font-weight:600;
+  white-space:nowrap;
+}
+.leave-match.ok{
+  background:#edf8f2;
+  color:#26704c;
+}
+.leave-match.warn{
+  background:#fff2df;
+  color:#9a5a0c;
+}
+.all-leave-card #allLeaveTable td:first-child{
+  white-space:nowrap;
+}
+@media(max-width:700px){
+  .count-badge{display:inline-flex;margin-left:4px;margin-top:4px}
+}

@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=20260903-clean6" />
+  <link rel="stylesheet" href="styles.css?v=20260903-leaves1" />
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3EOT%3C/text%3E%3C/svg%3E">
   <style>
     /* Critical: author CSS (.center-shell { display:grid }) must not override HTML hidden state */
@@ -205,6 +205,17 @@
             <div id="conflictEmpty" class="empty-state">ยังไม่ได้ดึง Calendar</div>
             <div class="table-wrap"><table id="conflictTable"></table></div>
           </section>
+
+          <section class="card all-leave-card">
+            <div class="section-head">
+              <div>
+                <h2>วันลาทั้งหมดที่ดึงมา <span class="count-badge"><span id="leaveCountBadge">0</span> รายการ</span></h2>
+                <p id="leaveSourceSummary" class="leave-source-summary"></p>
+              </div>
+            </div>
+            <div id="allLeaveEmpty" class="empty-state">ยังไม่ได้ดึงวันลา</div>
+            <div class="table-wrap"><table id="allLeaveTable"></table></div>
+          </section>
         </section>
       </section>
 
@@ -223,7 +234,7 @@
             <li><b>เลือกรอบ OT</b><span>ตรวจวันที่ด้านบนให้เป็นรอบที่ต้องการ เช่น 16 ส.ค. – 15 ก.ย.</span></li>
             <li><b>เลือกไฟล์เวรให้ครบ 3 หน่วย</b><span>เลือกไฟล์ LAB, Molec และ Bacteria ของรอบนั้น</span></li>
             <li><b>ใส่วันที่ 00000328 ถ้ามี</b><span>ถ้า HR แจ้งวันพิเศษช่วงปีใหม่หรือสงกรานต์ ให้เพิ่มวันที่แล้วกด “บันทึกวันที่” ถ้าไม่มีให้ข้าม</span></li>
-            <li><b>กด “ดึงวันลา”</b><span>ระบบจะนำวันลาล่าสุดมาเทียบกับตารางเวร</span></li>
+            <li><b>กด “ดึงวันลา”</b><span>หลังดึงแล้ว ดูหัวข้อ “วันลาทั้งหมดที่ดึงมา” เพื่อตรวจว่ารายการเข้ามาครบ</span></li>
             <li><b>ตรวจรายการที่ระบบเตือน</b><span>ถ้ามีคนติดวันลา ให้เช็กว่าเปลี่ยนเวรหรือมาทำงานจริงก่อน</span></li>
             <li><b>กด “ยืนยันและบันทึกรอบนี้”</b><span>เมื่อข้อมูลถูกต้องแล้ว ให้บันทึกรอบไว้</span></li>
             <li><b>กด “Export HR Excel”</b><span>ระบบจะจัดรายการสำหรับ HR ให้พร้อม รวมสิทธิ์ 00000328 ถ้ามี</span></li>
@@ -248,6 +259,6 @@
     };
     window.PSC_OT_CONFIG = window.LAB_OT_CONFIG;
   </script>
-  <script src="app.js?v=20260903-10"></script>
+  <script src="app.js?v=20260903-11"></script>
 </body>
 </html>
