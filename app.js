@@ -629,6 +629,9 @@
         : '<div class="empty-state compact-empty">ยังไม่มีรายการในตารางเบิก HR</div>';
 
       const verifyOk=hasNewPlan && hp.verifyOk!==false && issues.length===0;
+      const normalPay=Number(hp.claimedHours||0)*130;
+      const specialPay=Number(hp.special328Amount ?? (specialCount*240) ?? 0);
+      const totalPay=normalPay+specialPay;
       const verifyBox=hasNewPlan
         ? `<div class="ack-verify-box ${verifyOk?'ok':'warn'}">
             <div class="ack-verify-head">
@@ -639,8 +642,9 @@
               <div><span>OT จริง</span><b>${Number(d.totalHours||r.ot_hours||0)} ชม.</b></div>
               <div><span>ยอดยกมา</span><b>${Number(hp.carryIn||0)} ชม.</b></div>
               <div><span>เบิก HR</span><b>${Number(hp.claimedHours||0)} ชม.</b></div>
+              <div><span>เงินที่ได้</span><b>${totalPay.toLocaleString('th-TH')} บาท</b></div>
               <div><span>ทบเดือนหน้า</span><b>${Number(hp.carryOut||0)} ชม.</b></div>
-              ${specialCount?`<div><span>00000328</span><b>${specialCount} ครั้ง</b></div>`:''}
+              ${specialCount?`<div><span>00000328</span><b>${specialCount} ครั้ง · ${specialPay.toLocaleString('th-TH')} บาท</b></div>`:''}
             </div>
             ${issues.length?`<div class="ack-verify-issues">${issues.map(x=>`<div>• ${esc(x)}</div>`).join('')}</div>`:''}
           </div>`
