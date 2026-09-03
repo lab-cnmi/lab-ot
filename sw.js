@@ -1,8 +1,8 @@
-const CACHE_NAME = 'lab-ot-shell-v223';
+const CACHE_NAME = 'lab-ot-shell-v224';
 const SHELL = [
   './',
   './index.html',
-  './styles.css?v=20260903-v223',
+  './styles.css?v=20260903-v224',
   './app.js?v=20260903-24',
   './manifest.webmanifest?v=20260903-8',
   './icons/icon-192.png',

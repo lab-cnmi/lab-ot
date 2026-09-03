@@ -993,3 +993,23 @@ td{line-height:1.45}
   .ack-round-filter select{min-width:150px;flex:1;max-width:220px}
   .section-head{align-items:flex-start}
 }
+
+
+/* V2.24 — Staff tab underline state fix */
+.staff-tabs .staff-tab{
+  color:#738797 !important;
+  border-bottom:3px solid transparent !important;
+  box-shadow:none !important;
+}
+.staff-tabs .staff-tab.active{
+  color:#176d9a !important;
+  border-bottom-color:#176d9a !important;
+}
+.staff-tabs .staff-tab:not(.active){
+  border-bottom-color:transparent !important;
+}
+.staff-tabs .staff-tab:focus,
+.staff-tabs .staff-tab:focus-visible{
+  outline:none;
+  box-shadow:none;
+}

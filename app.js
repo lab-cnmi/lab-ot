@@ -488,10 +488,29 @@
   }
 
   function switchStaffTab(name) {
-    document.querySelectorAll('.staff-tab').forEach(x=>x.classList.toggle('active',x.dataset.staffTab===name));
-    document.querySelectorAll('.staff-tab-panel').forEach(x=>x.classList.toggle('active',x.id===`staff-tab-${name}`));
-    if(name==='myack') loadAckPortal();
-    if(name==='log') loadAppLogs('staff');
+    const tabs=[...document.querySelectorAll('.staff-tab')];
+    const panels=[...document.querySelectorAll('.staff-tab-panel')];
+
+    tabs.forEach(tab=>{
+      tab.classList.remove('active');
+      tab.setAttribute('aria-selected','false');
+      tab.tabIndex=-1;
+    });
+    panels.forEach(panel=>panel.classList.remove('active'));
+
+    const activeTab=tabs.find(tab=>tab.dataset.staffTab===name) || tabs[0];
+    const activeName=activeTab?.dataset.staffTab || 'myack';
+    const activePanel=document.getElementById(`staff-tab-${activeName}`);
+
+    if(activeTab){
+      activeTab.classList.add('active');
+      activeTab.setAttribute('aria-selected','true');
+      activeTab.tabIndex=0;
+    }
+    if(activePanel) activePanel.classList.add('active');
+
+    if(activeName==='myack') loadAckPortal();
+    if(activeName==='log') loadAppLogs('staff');
   }
 
   /* ===========================
