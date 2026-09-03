@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <meta name="theme-color" content="#f5f7fa" />
   <title>LAB OT — LAB / Molec / Bacteria</title>
-  <link rel="stylesheet" href="styles.css?v=20260903-font1" />
+  <link rel="stylesheet" href="styles.css?v=20260903-rate2" />
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3EOT%3C/text%3E%3C/svg%3E">
   <style>
     /* Critical: author CSS (.center-shell { display:grid }) must not override HTML hidden state */
@@ -83,6 +83,33 @@
           <b>ระบบคิดต่างกันตามหน่วย</b>
           <span><b>LAB/Molec</b> วันธรรมดา 16 ชม. · เสาร์/อาทิตย์หรือวันที่มี * = 24 ชม. &nbsp;•&nbsp; <b>Bacteria</b> คิดตามช่องเวลาจริง H1/H2/H3 = 8 ชม., Extra = 4 ชม., บ่าย = 8 ชม., ดึก = 8 ชม.</span>
         </div>
+
+        <section class="special-rate-card">
+          <div>
+            <div class="section-kicker">เรท OT ของหน่วย</div>
+            <h3>MT 130 บาท/ชม. เป็นค่าปกติ</h3>
+            <p>เครื่องหมาย <b>*</b> ในตารางมีผลเฉพาะจำนวนชั่วโมงเวร ไม่ได้หมายถึงเรท 160 บาท/ชม.</p>
+            <p id="specialRateStaffNote"><b>วันที่เรทพิเศษ 160:</b> <span id="specialRateStaffStatus">ยังไม่ได้กำหนด — รอบนี้ใช้ MT 130 บาท/ชม. ทุกวัน</span></p>
+          </div>
+        </section>
+
+        <section id="specialRateAdminCard" class="card admin-setting-card" hidden>
+          <div class="section-head">
+            <div>
+              <h2>Admin · วันที่ OT เรทพิเศษ 160 บาท/ชม.</h2>
+              <p>เพิ่มเฉพาะวันที่หน่วยประกาศ เช่น ช่วงปีใหม่หรือสงกรานต์ หากยังไม่มีประกาศให้เว้นว่าง</p>
+            </div>
+          </div>
+          <div class="special-rate-controls">
+            <label>เลือกวันที่
+              <input id="specialRateDatePicker" type="date" />
+            </label>
+            <button id="addSpecialRateDateBtn" class="secondary-btn compact" type="button">เพิ่มวัน</button>
+            <button id="saveSpecialRateDatesBtn" class="primary-btn compact" type="button">บันทึกการตั้งค่า</button>
+          </div>
+          <div id="specialRateDateList" class="date-chip-list"></div>
+          <p class="subtle">สถานะรอบนี้: <span id="specialRateStatus">ยังไม่ได้กำหนด — รอบนี้ใช้ MT 130 บาท/ชม. ทุกวัน</span></p>
+        </section>
 
         <section class="card">
           <div class="section-head">
@@ -176,7 +203,7 @@
             <li><b>กด “ดึงวันลาล่าสุด”</b><span>ระบบไปอ่าน Calendar สดที่ Admin เชื่อมไว้ ไม่ต้องดาวน์โหลด .ics เอง</span></li>
             <li><b>ตรวจคำเตือน</b><span>ถ้าชื่อเดียวกันมีเวรและมีรายการใน Calendar วันเดียวกัน ให้ตรวจว่ามีเปลี่ยนเวร/มาทำจริงหรือไม่</span></li>
             <li><b>กดยืนยัน</b><span>ระบบเก็บ Snapshot ของ Excel ทั้ง 3 หน่วย + Calendar ณ เวลานั้นไว้</span></li>
-            <li><b>Export HR Excel</b><span>สร้างไฟล์ HR dummy แบบเดียวกับระบบ CNMI เป็นช่วงละ 8 ชั่วโมง พร้อมหลบวันลาและบันทึกยอดทบ</span></li>
+            <li><b>Export HR Excel</b><span>ทุกคนเป็น MT ฐาน 130 บาท/ชม.; 160 ใช้เฉพาะวันที่ Admin บันทึกตามประกาศปีใหม่/สงกรานต์ แล้วสร้าง HR dummy ช่วงละ 8 ชั่วโมง</span></li>
           </ol>
           <div class="tip-box"><b>ถ้าหัวเดือนใน Excel ผิด</b><span>ระบบใช้ “รอบที่เลือกในหน้าเว็บ” เป็นหลัก และจะแจ้งเตือนว่าหัวไฟล์ไม่ตรง แต่ไม่ทำให้วันที่เลื่อนไปผิดเดือน</span></div>
           <div class="tip-box"><b>Bacteria — เวรดึก</b><span>ช่อง “ดึก 00:00–08:00” นับเป็นวันถัดไป เช่น แถววันที่ 15 ส.ค. ช่องดึก = OT วันที่ 16 ส.ค. จึงเข้ารอบ 16 ส.ค.–15 ก.ย.</span></div>
@@ -200,6 +227,6 @@
     };
     window.PSC_OT_CONFIG = window.LAB_OT_CONFIG;
   </script>
-  <script src="app.js?v=20260903-5"></script>
+  <script src="app.js?v=20260903-6"></script>
 </body>
 </html>

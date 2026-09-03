@@ -11,3 +11,33 @@ body{-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;}
 label,.tab,.user-badge,.primary-btn,.secondary-btn,.ghost-btn,.danger-btn{font-weight:600;}
 .eyebrow,.section-kicker{font-weight:600;letter-spacing:.08em;}
 .metric b,.step-no,.file-status.ok,.file-status.warn,th,.pill{font-weight:600;}
+
+
+/* V2.2 special-rate settings */
+.special-rate-card{
+  margin:16px 0;
+  padding:18px 22px;
+  border:1px solid var(--line, #dbe5ec);
+  border-radius:18px;
+  background:#fffdf7;
+}
+.special-rate-card h3{margin:4px 0 6px;font-size:1.05rem}
+.special-rate-card p{margin:4px 0;color:var(--muted, #66788a)}
+.admin-setting-card{border-style:dashed}
+.special-rate-controls{
+  display:flex;gap:10px;align-items:end;flex-wrap:wrap;margin-top:12px
+}
+.special-rate-controls label{min-width:190px}
+.date-chip-list{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
+.date-chip{
+  display:inline-flex;align-items:center;gap:7px;
+  padding:7px 10px;border-radius:999px;
+  background:#edf6fb;border:1px solid #cfe2ee;font-weight:600
+}
+.date-chip button{
+  border:0;background:transparent;cursor:pointer;font-size:18px;line-height:1;color:#6b7d8e;padding:0 2px
+}
+@media (max-width:700px){
+  .special-rate-controls{align-items:stretch}
+  .special-rate-controls label,.special-rate-controls button{width:100%}
+}
