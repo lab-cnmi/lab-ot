@@ -1220,3 +1220,39 @@ td{line-height:1.45}
   .result-search input[type=search]{width:100%;max-width:none}
   .compact-pager{justify-content:space-between}
 }
+
+
+/* V2.27 — employee code in user management */
+#newUserEmployeeCode[readonly]{
+  height:44px;
+  min-height:44px;
+  background:#f4f7f9;
+  color:#4f687a;
+  border:1px solid #d7e1e8;
+  border-radius:10px;
+  padding:0 12px;
+  font-family:inherit;
+  font-size:14px;
+  font-weight:600;
+  box-sizing:border-box;
+}
+.employee-code-cell{
+  display:inline-block;
+  white-space:nowrap;
+  font-weight:600;
+  color:#506b7d;
+  font-variant-numeric:tabular-nums;
+}
+@media(min-width:1281px){
+  .new-user-grid{
+    grid-template-columns:
+      minmax(190px,1.15fr)
+      minmax(120px,.72fr)
+      minmax(190px,1.15fr)
+      minmax(180px,1fr)
+      minmax(130px,.78fr)
+      minmax(190px,1fr)
+      105px
+      auto;
+  }
+}

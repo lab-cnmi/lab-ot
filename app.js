@@ -941,6 +941,13 @@
     ).join('');
   }
 
+  function syncNewUserEmployeeCode() {
+    const sel=$('newUserStaff');
+    const option=sel?.selectedOptions?.[0];
+    const code=String(option?.dataset?.employee||'');
+    if($('newUserEmployeeCode')) $('newUserEmployeeCode').value=code;
+  }
+
   async function invokeAdminUsers(action,payload={}) {
     const {data,error}=await state.sb.functions.invoke('admin-users',{body:{action,...payload}});
     if(error) throw error;
@@ -962,6 +969,7 @@
       empty.hidden=true;
       table.innerHTML=`<thead><tr>
         <th>Username</th>
+        <th>รหัสพนักงาน</th>
         <th>ชื่อ-สกุล</th>
         <th>ตำแหน่ง</th>
         <th>Role</th>
@@ -976,6 +984,7 @@
         const role=String(u.role||'staff').toLowerCase()==='admin'?'admin':'staff';
         return `<tr class="${locked?'protected-user-row':''}">
           <td><b>${esc(username)}</b><div class="subtle">${esc(u.email||'')}</div></td>
+          <td><span class="employee-code-cell">${esc(u.employeeCode||'-')}</span></td>
           <td><input class="user-edit-input" type="text" data-user-name="${esc(u.id)}" value="${esc(u.displayName||'')}" ${locked?'disabled':''}></td>
           <td><input class="user-edit-input" type="text" data-user-position="${esc(u.id)}" value="${esc(u.position||'')}" placeholder="ตำแหน่ง" ${locked?'disabled':''}></td>
           <td>
@@ -1037,6 +1046,7 @@
       if($('newUserActive')) $('newUserActive').checked=true;
       if($('newUserRole')) $('newUserRole').value='staff';
       populateUserStaffSelect();
+      syncNewUserEmployeeCode();
       toast('สร้างบัญชีแล้ว');
       await Promise.all([loadManagedUsers(),loadAckManagerData()]);
     }catch(ex){
@@ -1171,6 +1181,7 @@
     $('saveAckEmailsBtn')?.addEventListener('click', saveAckMappings);
     $('exportAckEvidenceBtn')?.addEventListener('click', exportAckEvidence);
     $('refreshAckBtn')?.addEventListener('click', loadAckManagerData);
+    $('newUserStaff')?.addEventListener('change', syncNewUserEmployeeCode);
     $('newUserForm')?.addEventListener('submit', createManagedUser);
     $('reloadManagedUsersBtn')?.addEventListener('click', loadManagedUsers);
     $('managedUsersTable')?.addEventListener('click', e=>{

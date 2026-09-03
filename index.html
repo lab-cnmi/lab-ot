@@ -7,13 +7,13 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="default" />
   <meta name="apple-mobile-web-app-title" content="LAB OT" />
-  <link rel="manifest" href="manifest.webmanifest?v=20260903-10" />
+  <link rel="manifest" href="manifest.webmanifest?v=20260903-11" />
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
   <title>LAB OT — LAB / Molec / Bacteria</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=20260903-v226" />
+  <link rel="stylesheet" href="styles.css?v=20260903-v227" />
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3EOT%3C/text%3E%3C/svg%3E">
   <style>
     /* Critical: author CSS (.center-shell { display:grid }) must not override HTML hidden state */
@@ -339,6 +339,9 @@
             <label>เจ้าหน้าที่
               <select id="newUserStaff" required></select>
             </label>
+            <label>รหัสพนักงาน
+              <input id="newUserEmployeeCode" type="text" placeholder="เลือกเจ้าหน้าที่ก่อน" inputmode="numeric" readonly>
+            </label>
             <label>Mahidol ID
               <span class="email-suffix-field">
                 <input id="newUserUsername" type="text" placeholder="username.sur" autocapitalize="none" spellcheck="false" required>
@@ -576,7 +579,7 @@
     };
     window.PSC_OT_CONFIG = window.LAB_OT_CONFIG;
   </script>
-  <script src="app.js?v=20260903-26"></script>
+  <script src="app.js?v=20260903-27"></script>
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(console.warn));
