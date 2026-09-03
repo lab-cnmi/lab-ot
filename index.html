@@ -5,7 +5,10 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <meta name="theme-color" content="#f5f7fa" />
   <title>LAB OT — LAB / Molec / Bacteria</title>
-  <link rel="stylesheet" href="styles.css?v=20260903-no160" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css?v=20260903-clean5" />
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3EOT%3C/text%3E%3C/svg%3E">
   <style>
     /* Critical: author CSS (.center-shell { display:grid }) must not override HTML hidden state */
@@ -66,7 +69,7 @@
           <div>
             <div class="section-kicker">รอบ HR</div>
             <h2 id="cycleTitle">-</h2>
-            <p>เลือกรอบครั้งเดียว แล้วระบบใช้รอบเดียวกันกับไฟล์ทั้ง 3 หน่วย</p>
+            <p>รอบ OT วันที่ 16 ถึงวันที่ 15 ของเดือนถัดไป</p>
           </div>
           <div class="cycle-controls">
             <label>เดือนเริ่มรอบ
@@ -79,47 +82,30 @@
           </div>
         </section>
 
-        <div class="notice-card">
-          <b>กติกา OT ของ LAB</b>
-          <span>ทุกคนเป็น <b>MT 130 บาท/ชม.</b> ไม่มีเรท 160 &nbsp;•&nbsp; <b>LAB/Molec</b> วันธรรมดา 16 ชม. · เสาร์/อาทิตย์หรือวันที่มี * = 24 ชม. &nbsp;•&nbsp; <b>Bacteria</b> H1/H2/H3 = 8 ชม., Extra = 4 ชม., บ่าย = 8 ชม., ดึก = 8 ชม. &nbsp;•&nbsp; ปีใหม่/สงกรานต์ใช้สิทธิ์ <b>00000328</b> ตามวันที่ HR ประกาศ</span>
+        <div class="quick-rules" aria-label="กติกาหลัก">
+          <span><b>OT ปกติ</b> MT 130 บาท/ชม.</span>
+          <span><b>00000328</b> 240 บาท / 8 ชม.</span>
+          <span><b>ไม่มีเรท 160</b></span>
         </div>
 
 
 
-        <section id="special328Card" class="card special328-card">
-          <div class="section-head">
-            <div>
-              <div class="section-kicker">สิทธิ์พิเศษ HR</div>
-              <h2>00000328 · 240 บาทต่อ 8 ชั่วโมง</h2>
-              <p>Staff หรือ Admin เพิ่มวันที่ที่ HR ประกาศ เช่น 13–15 เม.ย. ระบบจะหาคนที่มีเวรจริงในช่วงนั้นและคำนวณสิทธิ์ 240 บาทต่อ 8 ชั่วโมงให้ โดย OT ปกติยังคง MT 130 บาท/ชม.</p>
-            </div>
-          </div>
-          <div class="special-rate-controls">
-            <label>วันที่ที่ใช้สิทธิ์ 00000328
-              <input id="special328DatePicker" type="date" />
-            </label>
-            <button id="addSpecial328DateBtn" class="secondary-btn compact" type="button">เพิ่มวัน</button>
-            <button id="saveSpecial328DatesBtn" class="primary-btn compact" type="button">บันทึกช่วง 00000328</button>
-          </div>
-          <div id="special328DateList" class="date-chip-list"></div>
-          <p class="subtle">ช่วงที่บันทึกไว้: <span id="special328Status">ยังไม่ได้กำหนดช่วงสิทธิ์ 00000328</span></p>
-        </section>
 
         <section class="card">
           <div class="section-head">
-            <div><h2>1. อัปตารางเวรให้ครบ 3 หน่วย</h2><p>ระบบจะไม่ให้ยืนยันรอบจนกว่าจะมี LAB + Molec + Bacteria ครบ</p></div>
+            <div><div class="section-kicker">ขั้นตอนที่ 1</div><h2>เลือกไฟล์เวร 3 หน่วย</h2></div>
             <span id="unitReadyBadge" class="pill">0 / 3 หน่วย</span>
           </div>
           <div class="unit-upload-grid">
             <article class="unit-upload">
               <div class="unit-head"><span class="unit-dot lab"></span><b>LAB</b></div>
-              <p>ตารางแบบ เวร A–D</p>
+              <p>เวร A–D</p>
               <input id="labFile" type="file" accept=".xlsx,.xls" />
               <div id="labStatus" class="file-status">ยังไม่ได้เลือกไฟล์</div>
             </article>
             <article class="unit-upload">
               <div class="unit-head"><span class="unit-dot molec"></span><b>Molec</b></div>
-              <p>ตารางแบบเดียวกับ LAB</p>
+              <p>เวรแบบ LAB</p>
               <input id="molecFile" type="file" accept=".xlsx,.xls" />
               <div id="molecStatus" class="file-status">ยังไม่ได้เลือกไฟล์</div>
             </article>
@@ -132,11 +118,30 @@
           </div>
         </section>
 
+        <section id="special328Card" class="card special328-card compact-special-card">
+          <div class="section-head">
+            <div>
+              <div class="section-kicker">ขั้นตอนที่ 2</div>
+              <h2>วันที่สิทธิ์ 00000328</h2>
+              <p>ใส่เฉพาะวันที่ HR แจ้ง ถ้าเดือนนี้ไม่มีให้ข้าม</p>
+            </div>
+          </div>
+          <div class="special-rate-controls">
+            <label>วันที่ตามประกาศ HR
+              <input id="special328DatePicker" type="date" />
+            </label>
+            <button id="addSpecial328DateBtn" class="secondary-btn compact" type="button">เพิ่ม</button>
+            <button id="saveSpecial328DatesBtn" class="primary-btn compact" type="button">บันทึกวันที่</button>
+          </div>
+          <div id="special328DateList" class="date-chip-list"></div>
+          <p class="subtle compact-status"><span id="special328Status">เดือนนี้ยังไม่ได้ใส่วันที่พิเศษ</span></p>
+        </section>
+
         <section class="card sync-card">
-          <div class="step-no">2</div>
+          <div class="step-no">3</div>
           <div class="sync-copy">
-            <h2>ดึงวันลาล่าสุดจาก Google Calendar</h2>
-            <p>Staff ไม่ต้อง Export Calendar เอง ระบบดึงจาก 2 Calendar ที่ Admin เชื่อมไว้หลังบ้าน</p>
+            <h2>ดึงวันลา</h2>
+            <p>กดเพื่อใช้วันลาล่าสุดตรวจเทียบกับตารางเวร</p>
             <div id="calendarStatus" class="file-status">อัปตารางเวรให้ครบ 3 หน่วยก่อน</div>
             <div id="calendarSyncMeta" class="sync-meta" hidden></div>
           </div>
@@ -153,15 +158,15 @@
           </div>
 
           <section class="card">
-            <div class="section-head"><div><h2>ตรวจไฟล์ก่อนบันทึก</h2><p>คำเตือนจะไม่แก้หรือตัด OT ให้อัตโนมัติ</p></div></div>
+            <div class="section-head"><div><h2>ตรวจไฟล์</h2></div></div>
             <div id="validationList" class="validation-list"></div>
           </section>
 
           <section id="special328EligibilityCard" class="card special328-eligibility" hidden>
             <div class="section-head">
               <div>
-                <h2>ตรวจสิทธิ์ 00000328 จากเวรจริง</h2>
-                <p>ระบบให้สิทธิ์ทุก 8 ชม. ที่มีเวรจริงในวันที่ HR กำหนด แล้วค่อยกระจาย Dummy ภายในช่วงนั้นโดยไม่ให้ต่อเนื่องเกิน 16 ชม.</p>
+                <h2>ตรวจสิทธิ์ 00000328</h2>
+                <p>ตรวจชื่อ จำนวนครั้ง และยอดเงินก่อน Export</p>
               </div>
             </div>
             <div id="special328EligibilityEmpty" class="empty-state">ยังไม่มีข้อมูล</div>
@@ -170,7 +175,7 @@
 
           <section class="card">
             <div class="section-head">
-              <div><h2>สรุปรวมรายคน</h2><p>รวมคนชื่อเดียวกันจากทุกหน่วยเป็นยอดเดียว และยังแยกดูยอดรายหน่วยได้</p></div>
+              <div><h2>สรุป OT รายคน</h2></div>
               <div class="actions">
                 <button id="exportBtn" class="secondary-btn" disabled>Export HR Excel</button>
                 <button id="saveBtn" class="primary-btn" disabled>ยืนยันและบันทึกรอบนี้</button>
@@ -180,12 +185,12 @@
           </section>
 
           <section class="card">
-            <div class="section-head"><div><h2>สรุปตามหน่วย</h2><p>ใช้ตรวจยอด LAB / Molec / Bacteria ก่อนส่ง</p></div></div>
+            <div class="section-head"><div><h2>สรุปตามหน่วย</h2></div></div>
             <div class="table-wrap"><table id="unitSummaryTable"></table></div>
           </section>
 
           <section class="card">
-            <div class="section-head"><div><h2>รายการวันลาที่ชนกับเวร</h2><p>ระบบใช้ Calendar เป็นตัวเตือนเท่านั้น ไม่หัก OT เอง</p></div></div>
+            <div class="section-head"><div><h2>เวรที่ตรงกับวันลา</h2><p>ถ้ามีรายการ ให้ตรวจว่าเจ้าหน้าที่มาทำเวรจริงหรือมีการเปลี่ยนเวร</p></div></div>
             <div id="conflictEmpty" class="empty-state">ยังไม่ได้ดึง Calendar</div>
             <div class="table-wrap"><table id="conflictTable"></table></div>
           </section>
@@ -194,25 +199,25 @@
 
       <section id="tab-history" class="tab-panel">
         <section class="card">
-          <div class="section-head"><div><h2>รอบที่บันทึกไว้</h2><p>เปิดรอบเดิมจะใช้ Snapshot ณ เวลาที่กดยืนยัน ไม่ Sync Calendar ใหม่เอง</p></div><button id="refreshHistoryBtn" class="secondary-btn">รีเฟรช</button></div>
+          <div class="section-head"><div><h2>รอบที่บันทึกไว้</h2></div><button id="refreshHistoryBtn" class="secondary-btn">รีเฟรช</button></div>
           <div id="historyList" class="history-list"></div>
         </section>
       </section>
 
       <section id="tab-guide" class="tab-panel">
-        <section class="guide-card">
-          <h2>วิธีทำทุกเดือน</h2>
+        <section class="guide-card simple-guide">
+          <h2>วิธีใช้ทุกเดือน</h2>
+          <p class="guide-intro">ทำตามลำดับนี้ได้เลย</p>
           <ol class="guide-steps">
-            <li><b>เลือกรอบ OT</b><span>เช่น 16 ส.ค. 2569 – 15 ก.ย. 2569 ระบบใช้รอบนี้กับทั้ง 3 หน่วย</span></li>
-            <li><b>อัป LAB + Molec + Bacteria</b><span>ต้องครบ 3 ไฟล์ ระบบจึงเปิดให้ดึง Calendar และยืนยันรอบ</span></li>
-            <li><b>กด “ดึงวันลาล่าสุด”</b><span>ระบบไปอ่าน Calendar สดที่ Admin เชื่อมไว้ ไม่ต้องดาวน์โหลด .ics เอง</span></li>
-            <li><b>ตรวจคำเตือน</b><span>ถ้าชื่อเดียวกันมีเวรและมีรายการใน Calendar วันเดียวกัน ให้ตรวจว่ามีเปลี่ยนเวร/มาทำจริงหรือไม่</span></li>
-            <li><b>กดยืนยัน</b><span>ระบบเก็บ Snapshot ของ Excel ทั้ง 3 หน่วย + Calendar ณ เวลานั้นไว้</span></li>
-            <li><b>ตั้งช่วงสิทธิ์เมื่อ HR ประกาศ</b><span>Staff ตั้งวันที่สิทธิ์ 00000328 ได้เอง เช่น ปีใหม่/สงกรานต์ ระบบคำนวณสิทธิ์จากเวรจริงเท่านั้น</span></li><li><b>Export HR Excel</b><span>สร้าง HR dummy 8 ชม. พร้อม 00000328 = 240 บาท/ครั้ง โดยจัดร่วมกับ OT ปกติและไม่ให้ต่อเนื่องเกิน 16 ชม.</span></li>
+            <li><b>เลือกรอบ OT</b><span>ตรวจวันที่ด้านบนให้เป็นรอบที่ต้องการ เช่น 16 ส.ค. – 15 ก.ย.</span></li>
+            <li><b>เลือกไฟล์เวรให้ครบ 3 หน่วย</b><span>เลือกไฟล์ LAB, Molec และ Bacteria ของรอบนั้น</span></li>
+            <li><b>ใส่วันที่ 00000328 ถ้ามี</b><span>ถ้า HR แจ้งวันพิเศษช่วงปีใหม่หรือสงกรานต์ ให้เพิ่มวันที่แล้วกด “บันทึกวันที่” ถ้าไม่มีให้ข้าม</span></li>
+            <li><b>กด “ดึงวันลา”</b><span>ระบบจะนำวันลาล่าสุดมาเทียบกับตารางเวร</span></li>
+            <li><b>ตรวจรายการที่ระบบเตือน</b><span>ถ้ามีคนติดวันลา ให้เช็กว่าเปลี่ยนเวรหรือมาทำงานจริงก่อน</span></li>
+            <li><b>กด “ยืนยันและบันทึกรอบนี้”</b><span>เมื่อข้อมูลถูกต้องแล้ว ให้บันทึกรอบไว้</span></li>
+            <li><b>กด “Export HR Excel”</b><span>ระบบจะจัดรายการสำหรับ HR ให้พร้อม รวมสิทธิ์ 00000328 ถ้ามี</span></li>
           </ol>
-          <div class="tip-box"><b>ถ้าหัวเดือนใน Excel ผิด</b><span>ระบบใช้ “รอบที่เลือกในหน้าเว็บ” เป็นหลัก และจะแจ้งเตือนว่าหัวไฟล์ไม่ตรง แต่ไม่ทำให้วันที่เลื่อนไปผิดเดือน</span></div>
-          <div class="tip-box"><b>Bacteria — เวรดึก</b><span>ช่อง “ดึก 00:00–08:00” นับเป็นวันถัดไป เช่น แถววันที่ 15 ส.ค. ช่องดึก = OT วันที่ 16 ส.ค. จึงเข้ารอบ 16 ส.ค.–15 ก.ย.</span></div>
-          <div class="tip-box"><b>สิทธิ์ Staff</b><span>Staff ทำงาน OT ในหน้าเว็บได้ครบ แต่ไม่มีเมนูตั้งค่า GitHub, Supabase, SQL หรือ Secret Calendar URL</span></div>
+          <div class="simple-note"><b>ถ้าไฟล์ไม่ตรงรอบหรือข้อมูลผิด</b><span>ดูคำเตือนในหน้า “ทำ OT รอบนี้” แล้วแก้ไฟล์ก่อน Export</span></div>
         </section>
       </section>
     </main>
@@ -232,6 +237,6 @@
     };
     window.PSC_OT_CONFIG = window.LAB_OT_CONFIG;
   </script>
-  <script src="app.js?v=20260903-8"></script>
+  <script src="app.js?v=20260903-9"></script>
 </body>
 </html>

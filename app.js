@@ -443,8 +443,8 @@
     for (const unit of UNITS) if (state.units[unit]) items.push(...state.units[unit].validation);
     if (unitsReady()) items.unshift({type:'ok',text:'ไฟล์ครบทั้ง 3 หน่วยแล้ว'});
     else items.unshift({type:'warn',text:'ต้องอัป LAB + Molec + Bacteria ให้ครบก่อนยืนยันรอบ'});
-    if (state.calendarSyncedAt) items.push({type:'ok',text:`Google Calendar อัปเดตล่าสุด ${fmtDateTimeThai(state.calendarSyncedAt)} · ${state.leaveEvents.length} รายการในช่วงรอบ`});
-    else items.push({type:'warn',text:'ยังไม่ได้ดึง Google Calendar ล่าสุด — ยังไม่สามารถยืนยันรอบได้'});
+    if (state.calendarSyncedAt) items.push({type:'ok',text:`วันลาที่ดึงล่าสุด ${fmtDateTimeThai(state.calendarSyncedAt)} · ${state.leaveEvents.length} รายการในช่วงรอบ`});
+    else items.push({type:'warn',text:'ยังไม่ได้ดึงวันลาล่าสุด'});
     $('validationList').innerHTML = items.map(x=>`<div class="validation-item ${x.type}">${esc(x.text)}</div>`).join('');
   }
 
@@ -458,10 +458,10 @@
 
   function renderConflicts() {
     if (!state.calendarSyncedAt) {
-      $('conflictEmpty').textContent='ยังไม่ได้ดึง Calendar'; $('conflictEmpty').hidden=false; $('conflictTable').innerHTML=''; return;
+      $('conflictEmpty').textContent='ยังไม่ได้ดึงวันลา'; $('conflictEmpty').hidden=false; $('conflictTable').innerHTML=''; return;
     }
     if (!state.conflicts.length) {
-      $('conflictEmpty').textContent='ไม่พบชื่อที่มีเวรและมีรายการ Calendar ในวันเดียวกัน'; $('conflictEmpty').hidden=false; $('conflictTable').innerHTML=''; return;
+      $('conflictEmpty').textContent='ไม่พบเวรที่ตรงกับวันลา'; $('conflictEmpty').hidden=false; $('conflictTable').innerHTML=''; return;
     }
     $('conflictEmpty').hidden=true;
     $('conflictTable').innerHTML=`<thead><tr><th>วันที่ OT</th><th>ชื่อ</th><th>หน่วย</th><th>เวร</th><th>เวลา</th><th class="num">ชม.</th><th>Calendar</th><th>รายการใน Calendar</th></tr></thead><tbody>${state.conflicts.map(x=>`<tr><td>${esc(fmtThaiDate(x.date))}</td><td><b>${esc(x.name)}</b></td><td>${esc(x.unit)}</td><td>${esc(x.duty)}</td><td>${esc(x.timeLabel)}</td><td class="num">${x.hours}</td><td>${esc(x.calendar)}</td><td>${esc(x.summary)}</td></tr>`).join('')}</tbody>`;
@@ -470,11 +470,11 @@
   async function syncCalendar() {
     if (!unitsReady()) return toast('กรุณาอัปตารางเวรให้ครบ 3 หน่วยก่อน');
     if (state.offline || !state.sb) return toast('โหมดทดลองไม่เชื่อม Calendar');
-    $('syncCalendarBtn').disabled=true; $('calendarStatus').className='file-status'; $('calendarStatus').textContent='กำลังดึง Google Calendar ล่าสุด…';
+    $('syncCalendarBtn').disabled=true; $('calendarStatus').className='file-status'; $('calendarStatus').textContent='กำลังดึงวันลาล่าสุด…';
     try {
       const { data, error } = await state.sb.functions.invoke('calendar-sync', { body:{ cycle_start:state.cycle.start, cycle_end:state.cycle.end } });
       if (error) throw error;
-      if (!data?.ok) throw new Error(data?.error || 'ดึง Calendar ไม่สำเร็จ');
+      if (!data?.ok) throw new Error(data?.error || 'ดึงวันลาไม่สำเร็จ');
       state.calendarSources = data.sources || [];
       state.leaveEvents = state.calendarSources.flatMap(src => (src.events||[]).map(ev => ({...ev, source:src.name}))).filter(ev => ev.start && ev.end);
       state.calendarSyncedAt = data.synced_at || new Date().toISOString(); state.loadedSnapshot=false; state.hrExport=null;
@@ -483,7 +483,7 @@
       $('calendarSyncMeta').innerHTML=`<b>อัปเดตล่าสุด:</b> ${esc(fmtDateTimeThai(state.calendarSyncedAt))}<br><b>Calendar:</b> ${esc(state.calendarSources.map(x=>x.name).join(' · '))}`;
       recompute(); toast('ดึงวันลาล่าสุดแล้ว');
     } catch (err) {
-      console.error(err); $('calendarStatus').className='file-status error'; $('calendarStatus').textContent=`ดึง Calendar ไม่สำเร็จ: ${err.message || err}`; toast('ดึง Calendar ไม่สำเร็จ');
+      console.error(err); $('calendarStatus').className='file-status error'; $('calendarStatus').textContent=`ดึงวันลาไม่สำเร็จ: ${err.message || err}`; toast('ดึงวันลาไม่สำเร็จ');
     } finally { $('syncCalendarBtn').disabled = state.offline || !unitsReady(); }
   }
 
@@ -633,11 +633,11 @@
     empty.hidden=true;
     table.innerHTML=`<thead><tr>
       <th>เบิก</th><th>ชื่อ</th><th>เวรจริงในช่วงพิเศษ</th>
-      <th class="num">สิทธิ์ 8 ชม.</th><th class="num">ยอดพิเศษ</th><th class="num">ความจุ Dummy</th>
+      <th class="num">จำนวนสิทธิ์</th><th class="num">เงินเพิ่ม</th><th class="num">จัดได้สูงสุด</th>
     </tr></thead><tbody>${rows.map(x=>`<tr>
       <td><input type="checkbox" data-special328-code="${esc(x.employeeCode)}" ${x.selected?'checked':''}></td>
       <td><b>${esc(x.nick)}</b><div class="subtle">${esc(x.fullName)} · ${esc(x.employeeCode)}</div></td>
-      <td>${x.sourceText.map(s=>`<div>${esc(s)}</div>`).join('')}${x.partialHours?`<div class="warn-text">มีเศษ ${x.partialHours} ชม. ที่ไม่ครบ 8 ชม. จึงไม่สร้าง 00000328 อัตโนมัติ</div>`:''}</td>
+      <td>${x.sourceText.map(s=>`<div>${esc(s)}</div>`).join('')}${x.partialHours?`<div class="warn-text">มี ${x.partialHours} ชม. ที่ยังไม่ครบ 8 ชม. จึงยังไม่นับเป็น 1 สิทธิ์</div>`:''}</td>
       <td class="num"><b>${x.units}</b> ครั้ง</td>
       <td class="num"><b>${x.pay.toLocaleString('th-TH')}</b> บาท</td>
       <td class="num">${x.capacity} ครั้ง ${x.units>x.capacity?'<div class="warn-text">ไม่พอ</div>':''}</td>
@@ -719,7 +719,7 @@
   /* ===========================
      HR EXPORT — LAB/Molec/Bacteria
      All personnel use MT rate only.
-     Normal base = 130 THB/h, special public holiday = 160 THB/h.
+     OT base = 130 THB/h on every day.
      HR dummy claim codes follow CNMI MT format:
        normal 00000074, holiday/weekend 00000075.
      =========================== */
@@ -787,6 +787,10 @@
   function hrIsDummyHoliday(date,holidaySet) { return hrWeekend(date) || holidaySet.has(date); }
   function hrActualRate() { return HR_MT.baseRate; }
   function hrAllowedSlots(date,holidaySet) { return hrIsDummyHoliday(date,holidaySet) ? [0,8,16] : [0,16]; }
+  function hrIsRegularWorkday(date,holidaySet) {
+    const day=parseIso(date).getDay();
+    return day>=1 && day<=5 && !hrIsDummyHoliday(date,holidaySet) && !state.special328Dates.includes(date);
+  }
   function hrIsLeaveEvent(ev) {
     const s=String(ev?.summary||'').toLowerCase();
     return /ลา|พักผ่อน|พักร้อน|ป่วย|ลากิจ|หาหมอ|พบแพทย์|แพทย์นัด|นัดตรวจ|ตรวจสุขภาพ/.test(s);
@@ -862,6 +866,17 @@
     const daySlots=(code,date)=>{const k=`${code}|${date}`;if(!byStaffDay.has(k))byStaffDay.set(k,new Set());return byStaffDay.get(k);};
     const datesForStaff=code=>{if(!staffDates.has(code))staffDates.set(code,new Set());return staffDates.get(code);};
     const existingFor=code=>{if(!existingByStaff.has(code))existingByStaff.set(code,[]);return existingByStaff.get(code);};
+
+    // เวลางานประจำ จ-ศ 08:00-16:00 ต้องนับรวมตอนตรวจ "ทำงานต่อเนื่องไม่เกิน 16 ชม."
+    // วันหยุด/เสาร์-อาทิตย์ไม่มี baseline นี้
+    for(const t of totals){
+      for(const date of dates){
+        if(hrIsRegularWorkday(date,holidaySet)){
+          existingFor(t.employeeCode).push({employeeCode:t.employeeCode,date,slot:8,baseline:true});
+        }
+      }
+    }
+
     for(const r of (reservedRows||[])){
       daySlots(r.employeeCode,r.date).add(r.slot);
       datesForStaff(r.employeeCode).add(r.date);
@@ -1087,12 +1102,12 @@
       const holidaySet=hrHolidayDates(assignments),carryInfo=await hrCarryInInfo(),totals=hrBuildTotals(assignments,carryInfo);
       const specialEligibility=buildSpecial328Eligibility(assignments);
       const special328=hrAllocateSpecial328(specialEligibility);
-      if(special328.failures.length) throw new Error(`จัดสิทธิ์ 00000328 ไม่ครบ: ${special328.failures.join(' | ')}`);
+      if(special328.failures.length) throw new Error(`ยังจัดสิทธิ์ 00000328 ได้ไม่ครบ: ${special328.failures.join(' | ')}`);
       const specialByCode=new Map();
       special328.rows.forEach(r=>specialByCode.set(r.employeeCode,(specialByCode.get(r.employeeCode)||0)+1));
       totals.forEach(t=>{t.special328Count=specialByCode.get(t.employeeCode)||0;t.special328Pay=t.special328Count*HR_SPECIAL_328.amountPer8h;});
       const allocation=hrAllocate(totals,holidaySet,special328.rows);
-      if(!allocation.rows.length) throw new Error('ไม่พบชั่วโมงที่สามารถสร้าง HR dummy ได้');
+      if(!allocation.rows.length) throw new Error('ไม่มีชั่วโมง OT ที่พร้อมจัดลงไฟล์ HR');
       const sourceRows=hrSourceRows(totals),summaryRows=hrStaffSummaryRows(totals);
       summaryRows.forEach(r=>{
         const t=totals.find(x=>x.employeeCode===r['รหัสพนักงาน']);
@@ -1152,7 +1167,7 @@
       }, { onConflict:'cycle_key' });
       if (error) throw error;
       state.snapshotAt=now; state.loadedSnapshot=true;
-      toast('ยืนยันและบันทึก Snapshot รอบนี้แล้ว'); await loadHistory();
+      toast('บันทึกรอบนี้แล้ว'); await loadHistory();
     } catch(err) { console.error(err); toast(`บันทึกไม่สำเร็จ: ${err.message || err}`); }
     finally { recompute(); }
   }
@@ -1164,7 +1179,7 @@
     state.history=data||[];
     $('historyList').innerHTML = state.history.length ? state.history.map(r => {
       const files=r.unit_file_names||{};
-      return `<div class="history-item"><div><b>${esc(fmtThaiRange(r.cycle_start,r.cycle_end))}</b><span>LAB: ${esc(files.LAB||'-')} · Molec: ${esc(files.Molec||'-')} · Bacteria: ${esc(files.Bacteria||'-')}</span><span>Snapshot ${esc(fmtDateTimeThai(r.snapshot_at||r.updated_at))}</span></div><div class="history-actions"><button class="secondary-btn" data-load-cycle="${esc(r.cycle_key)}">เปิดรอบนี้</button><button class="danger-btn" data-delete-cycle="${esc(r.cycle_key)}">ลบรอบ</button></div></div>`;
+      return `<div class="history-item"><div><b>${esc(fmtThaiRange(r.cycle_start,r.cycle_end))}</b><span>LAB: ${esc(files.LAB||'-')} · Molec: ${esc(files.Molec||'-')} · Bacteria: ${esc(files.Bacteria||'-')}</span><span>บันทึกเมื่อ ${esc(fmtDateTimeThai(r.snapshot_at||r.updated_at))}</span></div><div class="history-actions"><button class="secondary-btn" data-load-cycle="${esc(r.cycle_key)}">เปิดรอบนี้</button><button class="danger-btn" data-delete-cycle="${esc(r.cycle_key)}">ลบรอบ</button></div></div>`;
     }).join('') : '<div class="empty-state">ยังไม่มีรอบที่บันทึกไว้</div>';
   }
 
@@ -1185,11 +1200,11 @@
     state.calendarSources=p.calendarSources||[]; state.leaveEvents=p.leaveEvents||[]; state.calendarSyncedAt=p.calendarSyncedAt||null; state.snapshotAt=data.snapshot_at||p.savedAt||null; state.loadedSnapshot=true; state.hrExport=p.hrExport||null; state.special328Dates=cleanSpecial328Dates(p.special328Dates||[]); state.special328Selected=(p.special328Selected&&typeof p.special328Selected==='object')?{...p.special328Selected}:{}; renderSpecial328Dates(); renderSpecial328Eligibility();
     setCycleControls({start:state.cycle.start,end:state.cycle.end});
     for(const unit of UNITS) {
-      const u=state.units[unit]; setUnitStatus(unit,u?`✓ โหลด Snapshot · ${u.fileName} · ${u.assignments?.length||0} รายการ`:'ไม่มีไฟล์ใน Snapshot',u?'ok':'error');
+      const u=state.units[unit]; setUnitStatus(unit,u?`✓ ${u.fileName} · ${u.assignments?.length||0} รายการ`:'ไม่มีไฟล์ในรอบนี้',u?'ok':'error');
     }
-    $('calendarStatus').className='file-status ok'; $('calendarStatus').textContent=`✓ ใช้ Snapshot Calendar เดิม ${state.calendarSources.length} ชุด · ไม่ได้ Sync ใหม่`;
-    $('calendarSyncMeta').hidden=false; $('calendarSyncMeta').innerHTML=`<b>Snapshot:</b> ${esc(fmtDateTimeThai(state.snapshotAt))}<br><b>Calendar ตอนบันทึก:</b> ${esc(fmtDateTimeThai(state.calendarSyncedAt))}`;
-    recompute(); switchTab('work'); toast('เปิด Snapshot เดิมแล้ว');
+    $('calendarStatus').className='file-status ok'; $('calendarStatus').textContent=`✓ ใช้วันลาที่บันทึกไว้กับรอบนี้`;
+    $('calendarSyncMeta').hidden=false; $('calendarSyncMeta').innerHTML=`<b>บันทึกรอบ:</b> ${esc(fmtDateTimeThai(state.snapshotAt))}<br><b>วันลาที่ใช้:</b> ${esc(fmtDateTimeThai(state.calendarSyncedAt))}`;
+    recompute(); switchTab('work'); toast('เปิดรอบที่บันทึกไว้แล้ว');
   }
 
   init().catch(err => { console.error(err); alert(err.message || err); });
