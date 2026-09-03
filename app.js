@@ -50,7 +50,11 @@
     installPrompt: null,
     appLogs: [],
     ownerPreviewRows: [],
-    ownerPreviewStaffKey: ''
+    ownerPreviewStaffKey: '',
+    managerOwnAckRows: [],
+    staffOwnAckRows: [],
+    adminAckCycleKey: '',
+    staffAckCycleKey: ''
   };
 
   const $ = id => document.getElementById(id);
@@ -695,6 +699,59 @@
     }).join('');
   }
 
+  function ackRoundMonthLabel(row) {
+    const d=parseIso(row?.cycle_end||'');
+    if(!d || Number.isNaN(d.getTime())) return fmtThaiRange(row?.cycle_start||'',row?.cycle_end||'');
+    return `${TH_MONTHS[d.getMonth()+1]} ${d.getFullYear()+543}`;
+  }
+
+  function ackRoundOptions(rows) {
+    const seen=new Set();
+    return (rows||[])
+      .filter(r=>r?.cycle_key && r?.cycle_end)
+      .slice()
+      .sort((a,b)=>String(b.cycle_start||'').localeCompare(String(a.cycle_start||'')))
+      .filter(r=>{
+        if(seen.has(r.cycle_key)) return false;
+        seen.add(r.cycle_key);
+        return true;
+      });
+  }
+
+  function setAckRoundSelect(select,rows,currentKey) {
+    if(!select) return currentKey||'';
+    const options=ackRoundOptions(rows);
+    if(!options.length){
+      select.innerHTML='<option value="">ยังไม่มีรอบ</option>';
+      select.disabled=true;
+      return '';
+    }
+    select.disabled=false;
+    const valid=options.some(r=>r.cycle_key===currentKey);
+    const key=valid?currentKey:options[0].cycle_key;
+    select.innerHTML=options.map(r=>`<option value="${esc(r.cycle_key)}" ${r.cycle_key===key?'selected':''}>${esc(ackRoundMonthLabel(r))}</option>`).join('');
+    return key;
+  }
+
+  function refreshAdminAckRoundFilter() {
+    const all=[...(state.managerOwnAckRows||[]),...(state.ownerPreviewRows||[])];
+    state.adminAckCycleKey=setAckRoundSelect($('adminAckCycleFilter'),all,state.adminAckCycleKey);
+  }
+
+  function renderManagerOwnAckFiltered() {
+    const rows=(state.managerOwnAckRows||[]).filter(r=>!state.adminAckCycleKey || r.cycle_key===state.adminAckCycleKey);
+    renderAckCards(rows,$('managerAckList'),$('myAckEmpty'));
+  }
+
+  function refreshStaffAckRoundFilter() {
+    state.staffAckCycleKey=setAckRoundSelect($('staffAckCycleFilter'),state.staffOwnAckRows||[],state.staffAckCycleKey);
+  }
+
+  function renderStaffOwnAckFiltered() {
+    const rows=(state.staffOwnAckRows||[]).filter(r=>!state.staffAckCycleKey || r.cycle_key===state.staffAckCycleKey);
+    renderAckCards(rows,$('ackList'),$('ackEmpty'));
+  }
+
   async function loadManagerOwnAck() {
     if(state.offline || !state.sb || !state.session?.user?.email || !normalizedUsers[String(state.session.user.email).toLowerCase()]) return;
     const email=String(state.session.user.email).toLowerCase();
@@ -704,7 +761,9 @@
       if($('myAckEmpty')){$('myAckEmpty').hidden=false;$('myAckEmpty').textContent='เปิดรายการรับทราบไม่ได้';}
       return;
     }
-    renderAckCards(data||[], $('managerAckList'), $('myAckEmpty'));
+    state.managerOwnAckRows=data||[];
+    refreshAdminAckRoundFilter();
+    renderManagerOwnAckFiltered();
   }
 
 
@@ -714,26 +773,17 @@
 
   async function loadOwnerStaffPreview() {
     const card=$('ownerStaffPreviewCard');
-    const table=$('ownerStaffPreviewTable');
     const empty=$('ownerStaffPreviewEmpty');
-    const previewList=$('ownerStaffPreviewList');
-    const previewEmpty=$('ownerStaffPreviewDetailEmpty');
-
-    if(!card || !table || !empty || !previewList || !previewEmpty) return;
+    if(!card || !empty) return;
 
     if(!canAdminPreviewAllStaff()){
       card.hidden=true;
-      table.innerHTML='';
-      previewList.innerHTML='';
       return;
     }
 
     card.hidden=false;
     empty.hidden=false;
-    empty.textContent='กำลังโหลดตัวอย่าง…';
-    table.innerHTML='';
-    previewList.innerHTML='';
-    previewEmpty.hidden=true;
+    empty.textContent='กำลังโหลดรายชื่อ…';
 
     try{
       const {data,error}=await state.sb
@@ -744,64 +794,69 @@
       if(error) throw error;
 
       state.ownerPreviewRows=data||[];
-      if(!state.ownerPreviewRows.length){
-        empty.hidden=false;
-        empty.textContent='ยังไม่มีรอบ OT ที่บันทึกและส่งให้รับทราบ';
-        previewEmpty.hidden=false;
-        previewEmpty.textContent='เมื่อบันทึกรอบ OT แล้ว จะเลือกดูตัวอย่างของเจ้าหน้าที่แต่ละคนได้ที่นี่';
-        return;
-      }
-
-      const byStaff=new Map();
-      for(const row of state.ownerPreviewRows){
-        const key=String(row.staff_key||row.email||row.display_name||'');
-        if(!byStaff.has(key)) byStaff.set(key,[]);
-        byStaff.get(key).push(row);
-      }
-
-      const staff=[...byStaff.entries()].map(([key,rows])=>{
-        const latest=rows[0];
-        return {
-          key,
-          name:latest.display_name||'-',
-          employeeCode:latest.employee_code||'',
-          email:latest.email||'',
-          latest,
-          rows
-        };
-      }).sort((a,b)=>a.name.localeCompare(b.name,'th'));
-
-      empty.hidden=true;
-      table.innerHTML=`<thead><tr>
-        <th>ชื่อ</th>
-        <th class="num">OT ล่าสุด</th>
-        <th>สถานะ</th>
-        <th></th>
-      </tr></thead><tbody>${staff.map(s=>{
-        const status=s.latest.status==='acknowledged'
-          ? '<span class="ack-status done">✓ รับทราบแล้ว</span>'
-          : (s.latest.email
-              ? '<span class="ack-status pending">รอรับทราบ</span>'
-              : '<span class="ack-status neutral">ยังไม่มี Mahidol ID</span>');
-        return `<tr class="${state.ownerPreviewStaffKey===s.key?'owner-preview-selected':''}">
-          <td><b>${esc(s.name)}</b>${s.employeeCode?`<div class="subtle">${esc(s.employeeCode)}</div>`:''}</td>
-          <td class="num"><b>${Number(s.latest.ot_hours||0)}</b> ชม.</td>
-          <td>${status}</td>
-          <td><button class="secondary-btn compact" type="button" data-owner-preview="${esc(s.key)}">ดูตัวอย่าง</button></td>
-        </tr>`;
-      }).join('')}</tbody>`;
-
-      if(!state.ownerPreviewStaffKey || !byStaff.has(state.ownerPreviewStaffKey)){
-        state.ownerPreviewStaffKey=staff[0]?.key||'';
-      }
-      renderOwnerStaffPreviewDetail();
+      refreshAdminAckRoundFilter();
+      renderManagerOwnAckFiltered();
+      renderOwnerStaffPreviewForCycle();
     }catch(err){
       console.error('load owner staff preview',err);
       empty.hidden=false;
-      empty.textContent='เปิดตัวอย่าง OT ของเจ้าหน้าที่ไม่ได้';
-      previewEmpty.hidden=false;
-      previewEmpty.textContent='กรุณาลองรีเฟรชอีกครั้ง';
+      empty.textContent='เปิด OT ของเจ้าหน้าที่ไม่ได้';
+      if($('ownerStaffPreviewTable')) $('ownerStaffPreviewTable').innerHTML='';
+      if($('ownerStaffPreviewList')) $('ownerStaffPreviewList').innerHTML='';
     }
+  }
+
+  function renderOwnerStaffPreviewForCycle() {
+    const table=$('ownerStaffPreviewTable');
+    const empty=$('ownerStaffPreviewEmpty');
+    const previewList=$('ownerStaffPreviewList');
+    const previewEmpty=$('ownerStaffPreviewDetailEmpty');
+    if(!table||!empty||!previewList||!previewEmpty||!canAdminPreviewAllStaff()) return;
+
+    const cycleRows=(state.ownerPreviewRows||[]).filter(r=>!state.adminAckCycleKey || r.cycle_key===state.adminAckCycleKey);
+    if(!cycleRows.length){
+      empty.hidden=false;
+      empty.textContent='รอบเดือนนี้ยังไม่มีรายการ OT';
+      table.innerHTML='';
+      previewList.innerHTML='';
+      previewEmpty.hidden=false;
+      previewEmpty.textContent='รอบเดือนนี้ยังไม่มีรายการ OT';
+      return;
+    }
+
+    const byStaff=new Map();
+    for(const row of cycleRows){
+      const key=String(row.staff_key||row.email||row.display_name||'');
+      if(!byStaff.has(key)) byStaff.set(key,[]);
+      byStaff.get(key).push(row);
+    }
+
+    const staff=[...byStaff.entries()].map(([key,rows])=>({
+      key,
+      name:rows[0].display_name||'-',
+      employeeCode:rows[0].employee_code||'',
+      email:rows[0].email||'',
+      latest:rows[0],
+      rows
+    })).sort((a,b)=>a.name.localeCompare(b.name,'th'));
+
+    empty.hidden=true;
+    table.innerHTML=`<thead><tr>
+      <th>ชื่อ</th><th class="num">OT รอบนี้</th><th>สถานะ</th><th></th>
+    </tr></thead><tbody>${staff.map(s=>{
+      const status=s.latest.status==='acknowledged'
+        ? '<span class="ack-status done">✓ รับทราบแล้ว</span>'
+        : (s.latest.email?'<span class="ack-status pending">รอรับทราบ</span>':'<span class="ack-status neutral">ยังไม่มี Mahidol ID</span>');
+      return `<tr class="${state.ownerPreviewStaffKey===s.key?'owner-preview-selected':''}">
+        <td><b>${esc(s.name)}</b>${s.employeeCode?`<div class="subtle">${esc(s.employeeCode)}</div>`:''}</td>
+        <td class="num"><b>${Number(s.latest.ot_hours||0)}</b> ชม.</td>
+        <td>${status}</td>
+        <td><button class="secondary-btn compact" type="button" data-owner-preview="${esc(s.key)}">ดูตัวอย่าง</button></td>
+      </tr>`;
+    }).join('')}</tbody>`;
+
+    if(!state.ownerPreviewStaffKey || !byStaff.has(state.ownerPreviewStaffKey)) state.ownerPreviewStaffKey=staff[0]?.key||'';
+    renderOwnerStaffPreviewDetail();
   }
 
   function renderOwnerStaffPreviewDetail() {
@@ -811,6 +866,7 @@
     if(!list||!empty||!canAdminPreviewAllStaff()) return;
 
     const rows=(state.ownerPreviewRows||[]).filter(r=>
+      (!state.adminAckCycleKey || r.cycle_key===state.adminAckCycleKey) &&
       String(r.staff_key||r.email||r.display_name||'')===String(state.ownerPreviewStaffKey||'')
     );
 
@@ -1078,6 +1134,8 @@
       },30);
     });
     $('refreshOwnerPreviewBtn')?.addEventListener('click',loadOwnerStaffPreview);
+    $('adminAckCycleFilter')?.addEventListener('change',e=>{ state.adminAckCycleKey=e.target.value; renderManagerOwnAckFiltered(); renderOwnerStaffPreviewForCycle(); });
+    $('staffAckCycleFilter')?.addEventListener('change',e=>{ state.staffAckCycleKey=e.target.value; renderStaffOwnAckFiltered(); });
     $('managerAckList')?.addEventListener('click', e=>{
       const btn=e.target.closest('[data-ack-cycle]');
       if(btn) acknowledgeOwnCycle(btn.dataset.ackCycle);
@@ -1877,7 +1935,9 @@
     if(error){
       empty.hidden=false; empty.textContent='เปิดรายการไม่ได้'; list.innerHTML=''; return;
     }
-    renderAckCards(data||[],list,empty);
+    state.staffOwnAckRows=data||[];
+    refreshStaffAckRoundFilter();
+    renderStaffOwnAckFiltered();
   }
 
   async function acknowledgeOwnCycle(cycleKey) {
