@@ -820,26 +820,33 @@
       console.error('load owner staff preview',err);
       empty.hidden=false;
       empty.textContent='เปิด OT ของเจ้าหน้าที่ไม่ได้';
-      if($('ownerStaffPreviewTable')) $('ownerStaffPreviewTable').innerHTML='';
       if($('ownerStaffPreviewList')) $('ownerStaffPreviewList').innerHTML='';
+      if($('adminAckStaffFilter')) $('adminAckStaffFilter').innerHTML='<option value="">เปิดรายชื่อไม่ได้</option>';
     }
   }
 
   function renderOwnerStaffPreviewForCycle() {
-    const table=$('ownerStaffPreviewTable');
+    const select=$('adminAckStaffFilter');
     const empty=$('ownerStaffPreviewEmpty');
     const previewList=$('ownerStaffPreviewList');
     const previewEmpty=$('ownerStaffPreviewDetailEmpty');
-    if(!table||!empty||!previewList||!previewEmpty||!canAdminPreviewAllStaff()) return;
+    const title=$('ownerStaffPreviewTitle');
+    if(!select||!empty||!previewList||!previewEmpty||!canAdminPreviewAllStaff()) return;
 
-    const cycleRows=(state.ownerPreviewRows||[]).filter(r=>!state.adminAckCycleKey || r.cycle_key===state.adminAckCycleKey);
+    const cycleRows=(state.ownerPreviewRows||[]).filter(r=>
+      !state.adminAckCycleKey || r.cycle_key===state.adminAckCycleKey
+    );
+
     if(!cycleRows.length){
-      empty.hidden=false;
-      empty.textContent='รอบเดือนนี้ยังไม่มีรายการ OT';
-      table.innerHTML='';
+      select.innerHTML='<option value="">ยังไม่มีเจ้าหน้าที่ในรอบนี้</option>';
+      select.disabled=true;
+      state.ownerPreviewStaffKey='';
       previewList.innerHTML='';
       previewEmpty.hidden=false;
       previewEmpty.textContent='รอบเดือนนี้ยังไม่มีรายการ OT';
+      if(title) title.textContent='OT ของเจ้าหน้าที่';
+      empty.hidden=false;
+      empty.textContent='รอบเดือนนี้ยังไม่มีรายการ OT';
       return;
     }
 
@@ -854,28 +861,27 @@
       key,
       name:rows[0].display_name||'-',
       employeeCode:rows[0].employee_code||'',
-      email:rows[0].email||'',
-      latest:rows[0],
-      rows
+      hours:Number(rows[0].ot_hours||0)
     })).sort((a,b)=>a.name.localeCompare(b.name,'th'));
 
-    empty.hidden=true;
-    table.innerHTML=`<thead><tr>
-      <th>ชื่อ</th><th class="num">OT รอบนี้</th><th>สถานะ</th><th></th>
-    </tr></thead><tbody>${staff.map(s=>{
-      const status=s.latest.status==='acknowledged'
-        ? '<span class="ack-status done">✓ รับทราบแล้ว</span>'
-        : (s.latest.email?'<span class="ack-status pending">รอรับทราบ</span>':'<span class="ack-status neutral">ยังไม่มี Mahidol ID</span>');
-      return `<tr class="${state.ownerPreviewStaffKey===s.key?'owner-preview-selected':''}">
-        <td><b>${esc(s.name)}</b>${s.employeeCode?`<div class="subtle">${esc(s.employeeCode)}</div>`:''}</td>
-        <td class="num"><b>${Number(s.latest.ot_hours||0)}</b> ชม.</td>
-        <td>${status}</td>
-        <td><button class="secondary-btn compact" type="button" data-owner-preview="${esc(s.key)}">ดูตัวอย่าง</button></td>
-      </tr>`;
-    }).join('')}</tbody>`;
+    select.disabled=false;
+    const valid=staff.some(s=>s.key===state.ownerPreviewStaffKey);
+    const selected=valid?state.ownerPreviewStaffKey:'';
+    if(!valid) state.ownerPreviewStaffKey='';
 
-    if(!state.ownerPreviewStaffKey || !byStaff.has(state.ownerPreviewStaffKey)) state.ownerPreviewStaffKey=staff[0]?.key||'';
-    renderOwnerStaffPreviewDetail();
+    select.innerHTML='<option value="">เลือกเจ้าหน้าที่</option>'+
+      staff.map(s=>`<option value="${esc(s.key)}" ${s.key===selected?'selected':''}>${esc(s.name)}${s.employeeCode?` · ${esc(s.employeeCode)}`:''}</option>`).join('');
+
+    // ไม่แสดงรายชื่อทั้งหมดและไม่ค้นหาอัตโนมัติ
+    empty.hidden=false;
+    empty.textContent='เลือกเจ้าหน้าที่ด้านบน แล้วกดค้นหา';
+
+    if(!state.ownerPreviewStaffKey){
+      previewList.innerHTML='';
+      previewEmpty.hidden=false;
+      previewEmpty.textContent='เลือกเจ้าหน้าที่ด้านบน แล้วกดค้นหา';
+      if(title) title.textContent='OT ของเจ้าหน้าที่';
+    }
   }
 
   function renderOwnerStaffPreviewDetail() {
@@ -892,8 +898,8 @@
     if(!rows.length){
       list.innerHTML='';
       empty.hidden=false;
-      empty.textContent='เลือกเจ้าหน้าที่เพื่อดูตัวอย่าง';
-      if(title) title.textContent='เลือกเจ้าหน้าที่เพื่อดู OT';
+      empty.textContent='เลือกเจ้าหน้าที่ด้านบน แล้วกดค้นหา';
+      if(title) title.textContent='OT ของเจ้าหน้าที่';
       return;
     }
 
@@ -1141,19 +1147,41 @@
     $('adminResetPasswordCancelBtn')?.addEventListener('click', closeResetUserPassword);
     $('adminResetPasswordCloseBtn')?.addEventListener('click', closeResetUserPassword);
     $('adminResetPasswordModal')?.addEventListener('click',e=>{if(e.target===$('adminResetPasswordModal'))closeResetUserPassword();});
-    $('ownerStaffPreviewTable')?.addEventListener('click',e=>{
-      const btn=e.target.closest('[data-owner-preview]');
-      if(!btn) return;
-      state.ownerPreviewStaffKey=btn.dataset.ownerPreview;
+    $('searchAdminAckStaffBtn')?.addEventListener('click',()=>{
+      const select=$('adminAckStaffFilter');
+      const key=String(select?.value||'');
+      if(!key){
+        toast('กรุณาเลือกเจ้าหน้าที่');
+        return;
+      }
+      state.ownerPreviewStaffKey=key;
       renderOwnerStaffPreviewDetail();
-      document.querySelectorAll('#ownerStaffPreviewTable tbody tr').forEach(tr=>tr.classList.remove('owner-preview-selected'));
-      btn.closest('tr')?.classList.add('owner-preview-selected');
+      if($('ownerStaffPreviewEmpty')) $('ownerStaffPreviewEmpty').hidden=true;
       setTimeout(()=>{
         $('ownerStaffPreviewDetail')?.scrollIntoView({behavior:'smooth',block:'start'});
       },30);
     });
+    $('clearAdminAckStaffBtn')?.addEventListener('click',()=>{
+      state.ownerPreviewStaffKey='';
+      if($('adminAckStaffFilter')) $('adminAckStaffFilter').value='';
+      if($('ownerStaffPreviewList')) $('ownerStaffPreviewList').innerHTML='';
+      if($('ownerStaffPreviewTitle')) $('ownerStaffPreviewTitle').textContent='OT ของเจ้าหน้าที่';
+      if($('ownerStaffPreviewDetailEmpty')){
+        $('ownerStaffPreviewDetailEmpty').hidden=false;
+        $('ownerStaffPreviewDetailEmpty').textContent='เลือกเจ้าหน้าที่ด้านบน แล้วกดค้นหา';
+      }
+      if($('ownerStaffPreviewEmpty')){
+        $('ownerStaffPreviewEmpty').hidden=false;
+        $('ownerStaffPreviewEmpty').textContent='เลือกเจ้าหน้าที่ด้านบน แล้วกดค้นหา';
+      }
+    });
     $('refreshOwnerPreviewBtn')?.addEventListener('click',loadOwnerStaffPreview);
-    $('adminAckCycleFilter')?.addEventListener('change',e=>{ state.adminAckCycleKey=e.target.value; renderManagerOwnAckFiltered(); renderOwnerStaffPreviewForCycle(); });
+    $('adminAckCycleFilter')?.addEventListener('change',e=>{
+      state.adminAckCycleKey=e.target.value;
+      state.ownerPreviewStaffKey='';
+      renderManagerOwnAckFiltered();
+      renderOwnerStaffPreviewForCycle();
+    });
     $('staffAckCycleFilter')?.addEventListener('change',e=>{ state.staffAckCycleKey=e.target.value; renderStaffOwnAckFiltered(); });
     $('managerAckList')?.addEventListener('click', e=>{
       const btn=e.target.closest('[data-ack-cycle]');

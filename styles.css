@@ -1013,3 +1013,54 @@ td{line-height:1.45}
   outline:none;
   box-shadow:none;
 }
+
+
+/* V2.25 — Admin month + staff search filters */
+.admin-ack-search-row{
+  display:flex;
+  align-items:flex-end;
+  justify-content:flex-end;
+  gap:8px;
+  flex-wrap:wrap;
+}
+.admin-ack-search-row .ack-round-filter{
+  min-width:180px;
+}
+.admin-ack-search-row .admin-staff-filter{
+  min-width:300px;
+}
+.admin-ack-search-row select{
+  height:44px;
+}
+.admin-filter-btn{
+  height:44px;
+  min-width:82px;
+  margin:0;
+}
+#ownerStaffPreviewEmpty{
+  min-height:54px;
+  padding:14px 0;
+}
+.owner-preview-detail-top{
+  margin-bottom:0;
+}
+@media(max-width:900px){
+  .admin-ack-search-row{
+    width:100%;
+    justify-content:flex-start;
+  }
+  .admin-ack-search-row .ack-round-filter,
+  .admin-ack-search-row .admin-staff-filter{
+    flex:1 1 220px;
+    min-width:0;
+  }
+}
+@media(max-width:560px){
+  .admin-ack-search-row .ack-round-filter,
+  .admin-ack-search-row .admin-staff-filter{
+    flex-basis:100%;
+  }
+  .admin-filter-btn{
+    flex:1 1 0;
+  }
+}
