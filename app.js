@@ -975,6 +975,12 @@
   }
   function hrIsDummyHoliday(date,holidaySet) { return hrWeekend(date) || holidaySet.has(date); }
   function hrActualRate() { return HR_MT.baseRate; }
+  function hrSlotTimes(slot) {
+    if (slot === 8) return { start:'08:00', end:'16:00', startValue:8/24, endValue:16/24 };
+    if (slot === 16) return { start:'16:00', end:'00:00', startValue:16/24, endValue:0 };
+    return { start:'00:00', end:'08:00', startValue:0, endValue:8/24 };
+  }
+
   function hrAllowedSlots(date,holidaySet) { return hrIsDummyHoliday(date,holidaySet) ? [0,8,16] : [0,16]; }
   function hrIsRegularWorkday(date,holidaySet) {
     const day=parseIso(date).getDay();
