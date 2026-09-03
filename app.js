@@ -168,44 +168,13 @@
   }
 
   function applyViewRole(role, {persist=true}={}) {
-    if (state.actualRole !== 'admin') role = state.actualRole || 'staff';
-    state.viewRole = role === 'staff' ? 'staff' : 'admin';
-
-    // ใช้ role ที่เลือกจริงกับหน้าแอป เพื่อให้ Admin ทดสอบแบบ Staff ได้เหมือน Staff login
+    state.viewRole = state.actualRole === 'admin' ? 'admin' : 'staff';
     state.role = state.viewRole;
     document.body.dataset.viewRole = state.viewRole;
-
-    const wrap = $('viewModeWrap');
-    const menu = $('viewModeMenu');
-    const btn = $('viewModeBtn');
-    const label = $('viewModeBtnLabel');
-
-    if (wrap) wrap.hidden = state.actualRole !== 'admin';
-    if (label) label.textContent = state.viewRole === 'staff' ? 'Staff' : 'Admin';
-
-    document.querySelectorAll('[data-admin-only]').forEach(el => {
-      el.hidden = state.role !== 'admin';
-    });
-    document.querySelectorAll('[data-staff-only]').forEach(el => {
-      el.hidden = state.role !== 'staff';
-    });
-    document.querySelectorAll('.view-mode-option').forEach(el => {
-      el.classList.toggle('active', el.dataset.viewRole === state.viewRole);
-    });
-
-    // ป้ายผู้ใช้แสดง role ที่กำลังใช้งานจริง ไม่ใช้คำว่า preview / มุมมอง
-    const email = String(state.session?.user?.email || '');
-    if ($('loginBadge') && state.actualRole === 'admin') {
-      $('loginBadge').textContent = `${state.role === 'staff' ? 'Staff' : 'Admin'} · ${email}`;
-    }
-
-    if (menu) menu.hidden = true;
-    if (btn) btn.setAttribute('aria-expanded', 'false');
-
-    if (persist && state.actualRole === 'admin') {
-      sessionStorage.setItem('labot_view_role', state.viewRole);
-    }
-
+    const wrap=$('viewModeWrap');
+    if(wrap) wrap.hidden=true;
+    document.querySelectorAll('[data-admin-only]').forEach(el=>{el.hidden=state.role!=='admin';});
+    document.querySelectorAll('[data-staff-only]').forEach(el=>{el.hidden=state.role!=='staff';});
     recompute();
   }
 
@@ -219,58 +188,69 @@
 
   async function acceptSession(session) {
     const email = String(session?.user?.email || '').trim().toLowerCase();
-    const info = normalizedUsers[email];
-
     state.session = session;
     state.offline = false;
 
-    // Admin / Staff ผู้ทำรอบ OT
-    if (info) {
-      state.actualRole = info.role;
-      state.role = info.role;
-      state.ackPerson = null;
-      $('loginBadge').textContent = `${info.role === 'admin' ? 'Admin' : 'Staff'} · ${email}`;
-      showOnly('appView');
-      const savedView = info.role === 'admin' ? sessionStorage.getItem('labot_view_role') : 'staff';
-      applyViewRole(savedView === 'staff' ? 'staff' : info.role, {persist:false});
-      await Promise.all([loadHistory(), loadSpecial328Settings(), loadAckManagerData(), loadManagerOwnAck()]);
-      if (state.actualRole === 'admin') loadManagedUsers();
-      maybeForcePasswordChange();
-      return;
-    }
-
-    // เจ้าหน้าที่ทั่วไป: เข้าได้เฉพาะเมื่อ Staff/Admin ผูก Mahidol ID กับรายชื่อไว้แล้ว
     try {
       const { data: person, error } = await state.sb
         .from('ot_ack_people')
-        .select('staff_key,employee_code,display_name,email,active')
+        .select('staff_key,employee_code,display_name,email,active,app_role,position')
         .eq('email', email)
-        .eq('active', true)
         .maybeSingle();
 
       if (error) throw error;
-      if (!person) {
+
+      const isOwner = email === 'parichat.ink@mahidol.ac.th';
+
+      if (!isOwner && (!person || person.active === false)) {
         await state.sb.auth.signOut();
-        $('loginError').textContent = 'บัญชีนี้ยังไม่ได้ถูกเพิ่มในรายชื่อรับทราบ OT กรุณาแจ้งผู้จัดทำ OT';
+        $('loginError').textContent = person?.active === false
+          ? 'บัญชีนี้ถูกปิดการใช้งาน กรุณาติดต่อผู้ดูแล'
+          : 'บัญชีนี้ยังไม่ได้ถูกเพิ่มในระบบ กรุณาติดต่อผู้ดูแล';
         $('loginError').hidden = false;
         showOnly('authView');
         return;
       }
 
-      state.actualRole = 'ack';
-      state.role = 'ack';
-      state.viewRole = 'ack';
-      state.ackPerson = person;
-      $('ackLoginBadge').textContent = `${person.display_name} · ${email}`;
-      showOnly('ackView');
-      await loadAckPortal();
+      const role = isOwner
+        ? 'admin'
+        : (String(person?.app_role || 'staff').toLowerCase() === 'admin' ? 'admin' : 'staff');
+
+      state.actualRole = role;
+      state.role = role;
+      state.viewRole = role;
+      state.ackPerson = person || {
+        staff_key:'emp:0020305',
+        employee_code:'0020305',
+        display_name:'น.ส. ปาริฉัตร อินทร์เกลี้ยง',
+        email,
+        active:true,
+        app_role:'admin',
+        position:''
+      };
+
+      if (role === 'admin') {
+        $('loginBadge').textContent = `Admin · ${email}`;
+        showOnly('appView');
+        applyViewRole('admin', {persist:false});
+        await Promise.all([
+          loadHistory(),
+          loadSpecial328Settings(),
+          loadAckManagerData(),
+          loadManagerOwnAck(),
+          loadManagedUsers()
+        ]);
+      } else {
+        $('ackLoginBadge').textContent = `${state.ackPerson?.display_name || email} · ${email}`;
+        showOnly('ackView');
+        await loadAckPortal();
+      }
+
       maybeForcePasswordChange();
     } catch (err) {
-      console.error('ack role lookup failed', err);
+      console.error('session role lookup failed', err);
       await state.sb.auth.signOut();
-      $('loginError').textContent = String(err?.message || '').includes('ot_ack_people')
-        ? 'ยังไม่ได้ติดตั้งฐานข้อมูลรับทราบ OT'
-        : 'เปิดรายการรับทราบไม่สำเร็จ';
+      $('loginError').textContent = 'เปิดบัญชีผู้ใช้งานไม่สำเร็จ กรุณาติดต่อผู้ดูแล';
       $('loginError').hidden = false;
       showOnly('authView');
     }
@@ -558,18 +538,43 @@
       }
       empty.hidden=true;
       table.innerHTML=`<thead><tr>
-        <th>Mahidol ID</th><th>ชื่อ</th><th>หน้าที่</th><th>สถานะ</th><th>เข้าใช้ล่าสุด</th><th></th>
+        <th>Username</th>
+        <th>ชื่อ-สกุล</th>
+        <th>ตำแหน่ง</th>
+        <th>Role</th>
+        <th>Active</th>
+        <th>First Login</th>
+        <th>Last Login</th>
+        <th>จัดการ</th>
       </tr></thead><tbody>${state.managedUsers.map(u=>{
         const username=String(u.email||'').replace(/@mahidol\.ac\.th$/i,'');
-        const role=u.isManager?'Admin':'รับทราบ OT';
-        const first=u.mustChangePassword?'รอตั้งรหัสใหม่':'พร้อมใช้';
-        return `<tr>
-          <td><b>${esc(username)}</b><div class="subtle">@mahidol.ac.th</div></td>
-          <td>${esc(u.displayName||'-')}</td>
-          <td>${esc(role)}</td>
-          <td><span class="ack-status ${u.mustChangePassword?'pending':'done'}">${esc(first)}</span></td>
+        const locked=String(u.email||'').toLowerCase()==='parichat.ink@mahidol.ac.th';
+        const first=u.mustChangePassword?'รอเปลี่ยนรหัส':'ตั้งรหัสแล้ว';
+        const role=String(u.role||'staff').toLowerCase()==='admin'?'admin':'staff';
+        return `<tr class="${locked?'protected-user-row':''}">
+          <td><b>${esc(username)}</b><div class="subtle">${esc(u.email||'')}</div></td>
+          <td><input class="user-edit-input" type="text" data-user-name="${esc(u.id)}" value="${esc(u.displayName||'')}" ${locked?'disabled':''}></td>
+          <td><input class="user-edit-input" type="text" data-user-position="${esc(u.id)}" value="${esc(u.position||'')}" placeholder="ตำแหน่ง" ${locked?'disabled':''}></td>
+          <td>
+            <select class="user-role-select" data-user-role="${esc(u.id)}" ${locked?'disabled':''}>
+              <option value="staff" ${role==='staff'?'selected':''}>Staff</option>
+              <option value="admin" ${role==='admin'?'selected':''}>Admin</option>
+            </select>
+          </td>
+          <td class="user-active-cell">
+            <label class="active-toggle">
+              <input type="checkbox" data-user-active="${esc(u.id)}" ${u.active!==false?'checked':''} ${locked?'disabled':''}>
+              <span>${u.active!==false?'Active':'Inactive'}</span>
+            </label>
+          </td>
+          <td><span class="${u.mustChangePassword?'first-login-pending':'first-login-done'}">${esc(first)}</span></td>
           <td>${u.lastSignInAt?esc(fmtDateTimeThai(u.lastSignInAt)):'-'}</td>
-          <td><button class="secondary-btn compact" type="button" data-reset-user="${esc(u.id)}" data-reset-email="${esc(u.email)}">Reset password</button></td>
+          <td class="user-actions">
+            ${locked
+              ? `<span class="protected-badge">บัญชีหลัก</span>`
+              : `<button class="secondary-btn compact" type="button" data-save-user="${esc(u.id)}">บันทึก</button>
+                 <button class="secondary-btn compact" type="button" data-reset-user="${esc(u.id)}" data-reset-email="${esc(u.email)}">Reset password</button>`}
+          </td>
         </tr>`;
       }).join('')}</tbody>`;
     }catch(err){
@@ -600,8 +605,14 @@
     const btn=$('createUserBtn');
     if(btn){btn.disabled=true;btn.textContent='กำลังสร้าง…';}
     try{
-      await invokeAdminUsers('create',{staffKey,employeeCode,displayName,position,username,password});
+      await invokeAdminUsers('create',{
+        staffKey,employeeCode,displayName,position,username,password,
+        role:String($('newUserRole')?.value||'staff'),
+        active:!!$('newUserActive')?.checked
+      });
       $('newUserForm')?.reset();
+      if($('newUserActive')) $('newUserActive').checked=true;
+      if($('newUserRole')) $('newUserRole').value='staff';
       populateUserStaffSelect();
       toast('สร้างบัญชีแล้ว');
       await Promise.all([loadManagedUsers(),loadAckManagerData()]);
@@ -613,7 +624,36 @@
     }
   }
 
+
+  async function saveManagedUser(userId) {
+    const user=state.managedUsers.find(x=>x.id===userId);
+    if(!user) return;
+
+    if(String(user.email||'').toLowerCase()==='parichat.ink@mahidol.ac.th'){
+      return toast('บัญชี parichat.ink ถูกล็อก ไม่อนุญาตให้แก้ไข');
+    }
+
+    const displayName=String(document.querySelector(`[data-user-name="${CSS.escape(userId)}"]`)?.value||'').trim();
+    const position=String(document.querySelector(`[data-user-position="${CSS.escape(userId)}"]`)?.value||'').trim();
+    const role=String(document.querySelector(`[data-user-role="${CSS.escape(userId)}"]`)?.value||'staff');
+    const active=!!document.querySelector(`[data-user-active="${CSS.escape(userId)}"]`)?.checked;
+
+    if(!displayName) return toast('กรุณาระบุชื่อ-สกุล');
+
+    try{
+      await invokeAdminUsers('update',{userId,displayName,position,role,active});
+      toast('บันทึกผู้ใช้งานแล้ว');
+      await Promise.all([loadManagedUsers(),loadAckManagerData()]);
+    }catch(err){
+      console.error('save managed user',err);
+      toast(err?.message||'บันทึกผู้ใช้งานไม่สำเร็จ');
+    }
+  }
+
   function openResetUserPassword(userId,email) {
+    if(String(email||'').toLowerCase()==='parichat.ink@mahidol.ac.th'){
+      return toast('บัญชี parichat.ink ถูกล็อก ไม่อนุญาตให้ Reset password จากหน้านี้');
+    }
     state.resetUser={id:userId,email};
     const modal=$('adminResetPasswordModal'), label=$('resetUserEmail');
     if(label) label.textContent=email||'';
@@ -666,8 +706,17 @@
     $('newUserForm')?.addEventListener('submit', createManagedUser);
     $('reloadManagedUsersBtn')?.addEventListener('click', loadManagedUsers);
     $('managedUsersTable')?.addEventListener('click', e=>{
-      const btn=e.target.closest('[data-reset-user]');
-      if(btn) openResetUserPassword(btn.dataset.resetUser,btn.dataset.resetEmail);
+      const save=e.target.closest('[data-save-user]');
+      if(save){ saveManagedUser(save.dataset.saveUser); return; }
+      const reset=e.target.closest('[data-reset-user]');
+      if(reset) openResetUserPassword(reset.dataset.resetUser,reset.dataset.resetEmail);
+    });
+    $('managedUsersTable')?.addEventListener('change', e=>{
+      const active=e.target.closest('[data-user-active]');
+      if(active){
+        const label=active.closest('.active-toggle')?.querySelector('span');
+        if(label) label.textContent=active.checked?'Active':'Inactive';
+      }
     });
     $('adminResetPasswordForm')?.addEventListener('submit', resetManagedUserPassword);
     $('adminResetPasswordCancelBtn')?.addEventListener('click', closeResetUserPassword);

@@ -7,13 +7,13 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="default" />
   <meta name="apple-mobile-web-app-title" content="LAB OT" />
-  <link rel="manifest" href="manifest.webmanifest?v=20260903-1" />
+  <link rel="manifest" href="manifest.webmanifest?v=20260903-2" />
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
   <title>LAB OT — LAB / Molec / Bacteria</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=20260903-v215" />
+  <link rel="stylesheet" href="styles.css?v=20260903-v216" />
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3EOT%3C/text%3E%3C/svg%3E">
   <style>
     /* Critical: author CSS (.center-shell { display:grid }) must not override HTML hidden state */
@@ -62,19 +62,6 @@
       </div>
       <div class="topbar-actions">
         <span id="loginBadge" class="user-badge"></span>
-        <div id="viewModeWrap" class="view-mode-wrap" hidden>
-          <button id="viewModeBtn" class="view-mode-btn" type="button" aria-haspopup="true" aria-expanded="false">
-            <span id="viewModeBtnLabel">Admin</span><span class="chevron">⌄</span>
-          </button>
-          <div id="viewModeMenu" class="view-mode-menu" hidden>
-            <button type="button" class="view-mode-option" data-view-role="admin">
-              <b>Admin</b>
-            </button>
-            <button type="button" class="view-mode-option" data-view-role="staff">
-              <b>Staff</b>
-            </button>
-          </div>
-        </div>
         <button id="changePasswordBtn" class="ghost-btn">เปลี่ยนรหัสผ่าน</button>
         <button id="logoutBtn" class="ghost-btn">ออกจากระบบ</button>
       </div>
@@ -263,7 +250,7 @@
           <div class="section-head">
             <div>
               <h2>เพิ่มผู้ใช้งาน</h2>
-              <p>ใช้เฉพาะบัญชี Mahidol ของเจ้าหน้าที่ในหน่วย</p>
+              <p>เพิ่มและจัดการบัญชีเจ้าหน้าที่ในหน่วย</p>
             </div>
           </div>
           <form id="newUserForm" class="new-user-grid">
@@ -279,8 +266,20 @@
             <label>ตำแหน่ง
               <input id="newUserPosition" type="text" placeholder="เช่น นักเทคนิคการแพทย์">
             </label>
+            <label>Role
+              <select id="newUserRole">
+                <option value="staff" selected>Staff</option>
+                <option value="admin">Admin</option>
+              </select>
+            </label>
             <label>รหัสผ่านชั่วคราว
               <input id="newUserPassword" type="password" minlength="8" placeholder="อย่างน้อย 8 ตัวอักษร" required>
+            </label>
+            <label class="create-active-label">Active
+              <span class="active-toggle create-active-toggle">
+                <input id="newUserActive" type="checkbox" checked>
+                <span>Active</span>
+              </span>
             </label>
             <button id="createUserBtn" class="primary-btn" type="submit">สร้างบัญชี</button>
           </form>
@@ -430,7 +429,7 @@
     };
     window.PSC_OT_CONFIG = window.LAB_OT_CONFIG;
   </script>
-  <script src="app.js?v=20260903-17"></script>
+  <script src="app.js?v=20260903-18"></script>
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(console.warn));
