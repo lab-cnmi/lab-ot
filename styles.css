@@ -102,24 +102,6 @@ table{font-size:13px}
 th{font-size:13px;font-weight:600}
 td{line-height:1.45}
 
-.quick-rules{
-  display:flex;
-  flex-wrap:wrap;
-  gap:8px;
-  margin-bottom:14px;
-}
-.quick-rules span{
-  display:inline-flex;
-  align-items:center;
-  gap:5px;
-  padding:7px 11px;
-  border-radius:999px;
-  border:1px solid #dbe7ee;
-  background:#f6fafc;
-  color:#526d80;
-  font-size:13px;
-}
-.quick-rules b{color:#245f7e;font-weight:600}
 
 .compact-special-card{
   padding:16px 18px;
