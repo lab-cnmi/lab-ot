@@ -258,7 +258,7 @@
           loadManagerOwnAck(),
           loadManagedUsers()
         ]);
-        if(isOwnerAdmin()) loadOwnerStaffPreview();
+        if(canAdminPreviewAllStaff()) loadOwnerStaffPreview();
         const savedView=sessionStorage.getItem('labot_view_role');
         applyViewRole(savedView==='staff'?'staff':'admin',{persist:false});
       } else {
@@ -676,9 +676,9 @@
         </section>
 
         ${readOnly
-          ? `<div class="owner-preview-note">${acknowledged
-              ? `เจ้าหน้าที่รับทราบแล้ว ${esc(fmtDateTimeThai(r.acknowledged_at))}`
-              : `ตัวอย่างหน้าที่เจ้าหน้าที่จะเห็น · มัสตรวจดูได้ แต่กดรับทราบแทนไม่ได้`}</div>`
+          ? (acknowledged
+              ? `<div class="ack-confirmed">รับทราบเมื่อ ${esc(fmtDateTimeThai(r.acknowledged_at))}</div>`
+              : '')
           : (acknowledged
               ? `<div class="ack-confirmed">รับทราบเมื่อ ${esc(fmtDateTimeThai(r.acknowledged_at))}</div>`
               : (hasNewPlan
@@ -708,9 +708,8 @@
   }
 
 
-  function isOwnerAdmin() {
-    return String(state.session?.user?.email||'').toLowerCase()==='parichat.ink@mahidol.ac.th'
-      && state.actualRole==='admin';
+  function canAdminPreviewAllStaff() {
+    return state.actualRole==='admin';
   }
 
   async function loadOwnerStaffPreview() {
@@ -722,7 +721,7 @@
 
     if(!card || !table || !empty || !previewList || !previewEmpty) return;
 
-    if(!isOwnerAdmin()){
+    if(!canAdminPreviewAllStaff()){
       card.hidden=true;
       table.innerHTML='';
       previewList.innerHTML='';
@@ -809,7 +808,7 @@
     const list=$('ownerStaffPreviewList');
     const empty=$('ownerStaffPreviewDetailEmpty');
     const title=$('ownerStaffPreviewTitle');
-    if(!list||!empty||!isOwnerAdmin()) return;
+    if(!list||!empty||!canAdminPreviewAllStaff()) return;
 
     const rows=(state.ownerPreviewRows||[]).filter(r=>
       String(r.staff_key||r.email||r.display_name||'')===String(state.ownerPreviewStaffKey||'')
@@ -1145,7 +1144,7 @@
     document.querySelectorAll('.tab-panel').forEach(x => x.classList.toggle('active', x.id === `tab-${name}`));
     if (name === 'history') loadHistory();
     if (name === 'users') loadManagedUsers();
-    if (name === 'myack') { loadManagerOwnAck(); if(isOwnerAdmin()) loadOwnerStaffPreview(); }
+    if (name === 'myack') { loadManagerOwnAck(); if(canAdminPreviewAllStaff()) loadOwnerStaffPreview(); }
     if (name === 'log') loadAppLogs('admin');
   }
 
@@ -2587,7 +2586,7 @@
         try{
           await syncAckRequests();
           await loadManagerOwnAck();
-          if(isOwnerAdmin()) await loadOwnerStaffPreview();
+          if(canAdminPreviewAllStaff()) await loadOwnerStaffPreview();
         }catch(ackErr){
           console.warn('refresh acknowledgement after HR export',ackErr);
         }
