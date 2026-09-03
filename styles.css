@@ -686,3 +686,45 @@ td{line-height:1.45}
   .role-switch select{height:40px;min-width:82px}
   .staff-tabs{overflow-x:auto;white-space:nowrap}
 }
+
+/* V2.18 — equal height for all controls in Add User form */
+.new-user-grid > label{
+  display:grid;
+  grid-template-rows:auto 46px;
+  align-items:end;
+}
+.new-user-grid input[type="text"],
+.new-user-grid input[type="password"],
+.new-user-grid select,
+.new-user-grid .email-suffix-field,
+.new-user-grid .create-active-toggle,
+.new-user-grid #createUserBtn{
+  height:46px !important;
+  min-height:46px !important;
+  box-sizing:border-box;
+}
+.new-user-grid input[type="text"],
+.new-user-grid input[type="password"],
+.new-user-grid select{
+  padding:0 12px !important;
+  line-height:44px;
+}
+.new-user-grid .email-suffix-field{
+  align-self:end;
+}
+.new-user-grid .email-suffix-field input{
+  height:44px !important;
+  min-height:44px !important;
+  padding:0 12px !important;
+  line-height:44px;
+}
+.new-user-grid .email-suffix{
+  height:44px;
+}
+.new-user-grid .create-active-toggle{
+  align-self:end;
+}
+.new-user-grid #createUserBtn{
+  align-self:end;
+  padding:0 18px;
+}
