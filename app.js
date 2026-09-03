@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  const CFG = window.LAB_OT_CONFIG || {};
+  const CFG = window.LAB_OT_CONFIG || window.PSC_OT_CONFIG || {};
   const USERS = CFG.USERS || {
     'parichat.ink@mahidol.ac.th': { role: 'admin', label: 'Admin' },
     'paleerat.ran@mahidol.ac.th': { role: 'staff', label: 'Staff' }
