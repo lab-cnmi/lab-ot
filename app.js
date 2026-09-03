@@ -167,7 +167,7 @@
   }
 
   async function init() {
-    bindUI(); initCycleControls(); setupPwaInstall(); populateUserStaffSelect();
+    bindUI(); initCycleControls(); setupPwaInstall();
     if (!configReady()) { showOnly('setupView'); return; }
     state.sb = window.supabase.createClient(CFG.SUPABASE_URL, CFG.SUPABASE_KEY || CFG.SUPABASE_ANON_KEY);
     const { data } = await state.sb.auth.getSession();
