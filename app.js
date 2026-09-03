@@ -662,6 +662,38 @@
     hoursPerClaim:8
   });
 
+
+  async function loadSpecial328Settings() {
+    state.special328Dates = [];
+    state.special328Selected = {};
+    renderSpecial328Dates();
+    renderSpecial328Eligibility();
+
+    if (state.offline || !state.sb || !state.cycle?.start) return;
+
+    const cycleKey = `${state.cycle.start}_${state.cycle.end}`;
+    const { data, error } = await state.sb
+      .from('ot_batches')
+      .select('payload')
+      .eq('cycle_key', cycleKey)
+      .limit(1);
+
+    if (error) {
+      console.warn('loadSpecial328Settings', error);
+      return;
+    }
+
+    const payload = data?.[0]?.payload || {};
+    state.special328Dates = cleanSpecial328Dates(payload.special328Dates || []);
+    state.special328Selected =
+      payload.special328Selected && typeof payload.special328Selected === 'object'
+        ? { ...payload.special328Selected }
+        : {};
+
+    renderSpecial328Dates();
+    renderSpecial328Eligibility();
+  }
+
   function cleanSpecial328Dates(list) {
     const out=[];
     for (const value of (Array.isArray(list)?list:[])) {
