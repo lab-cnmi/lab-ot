@@ -41,3 +41,15 @@ label,.tab,.user-badge,.primary-btn,.secondary-btn,.ghost-btn,.danger-btn{font-w
   .special-rate-controls{align-items:stretch}
   .special-rate-controls label,.special-rate-controls button{width:100%}
 }
+
+/* V2.3 — special HR code 00000328 */
+.special328-card{
+  border:1px solid #f0d7a6;
+  background:linear-gradient(180deg,#fffdf8 0%,#fffaf0 100%);
+}
+.date-chip.special328{background:#fff3d8;border-color:#edd29a}
+.special328-eligibility{border-color:#e7d7b5}
+.special328-eligibility th:first-child,
+.special328-eligibility td:first-child{width:54px;text-align:center}
+.special328-eligibility input[type="checkbox"]{width:18px;height:18px;accent-color:#1f789f}
+.warn-text{color:#a46114;font-weight:600;font-size:.92em;margin-top:4px}
