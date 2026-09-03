@@ -2641,6 +2641,7 @@
   }
   function hrIsDummyHoliday(date,holidaySet) { return hrWeekend(date) || holidaySet.has(date); }
   function hrActualRate() { return HR_MT.baseRate; }
+  const HR_DUMMY_SLOT_CAPACITY = 8; // แถว A–H ต่อช่วงเวลา
   function hrSlotTimes(slot) {
     if (slot === 8) return { start:'08:00', end:'16:00', startValue:8/24, endValue:16/24 };
     if (slot === 16) return { start:'16:00', end:'00:00', startValue:16/24, endValue:0 };
@@ -2767,7 +2768,7 @@
       while(left>0 && turn++<100){
         const candidates=slots.filter(s=>{
           const reserved=reservedByCell.get(`${info.date}|${s}`)||0;
-          return reserved+(info.slotTargets.get(s)||0)<6;
+          return reserved+(info.slotTargets.get(s)||0)<HR_DUMMY_SLOT_CAPACITY;
         }).sort((a,b)=>{
           const ca=(reservedByCell.get(`${info.date}|${a}`)||0)+(info.slotTargets.get(a)||0);
           const cb=(reservedByCell.get(`${info.date}|${b}`)||0)+(info.slotTargets.get(b)||0);
@@ -2823,17 +2824,17 @@
     };
     const canUseStrict=(t,cell)=>{
       if(cell.assigned>=cell.target) return false;
-      if(cell.assigned+cell.reserved>=6) return false;
+      if(cell.assigned+cell.reserved>=HR_DUMMY_SLOT_CAPACITY) return false;
       return personCanUse(t,cell);
     };
     const canUseWithinDay=(t,cell)=>{
       const info=infoMap.get(cell.date);
       if(normalDateOcc(cell.date)>=info.target) return false;
-      if(cell.assigned+cell.reserved>=6) return false;
+      if(cell.assigned+cell.reserved>=HR_DUMMY_SLOT_CAPACITY) return false;
       return personCanUse(t,cell);
     };
     const canUseOverflow=(t,cell)=>{
-      if(cell.assigned+cell.reserved>=6) return false;
+      if(cell.assigned+cell.reserved>=HR_DUMMY_SLOT_CAPACITY) return false;
       return personCanUse(t,cell);
     };
     const add=(t,cell)=>{
@@ -2935,7 +2936,7 @@
     const countValues=dailyCounts.map(x=>x.total);
     const dailyMin=countValues.length?Math.min(...countValues):0;
     const dailyMax=countValues.length?Math.max(...countValues):0;
-    return {rows,leaveSkipped,dailyCounts,dailyMin,dailyMax,dailyTargetBase:dailyBase};
+    return {rows,leaveSkipped,dailyCounts,dailyMin,dailyMax,dailyTargetBase:dailyBase,slotCapacity:HR_DUMMY_SLOT_CAPACITY};
   }
 
   function hrSourceRows(totals) {
@@ -2959,7 +2960,7 @@
       'รหัสพนักงาน':t.employeeCode,'ชื่อ':t.fullName,'ชื่อเล่น':t.nick,'กลุ่ม HR':'MT','ฐาน HR':HR_MT.baseRate,
       'ชั่วโมงจริงรวม':t.actual,'OT เดือนนี้เทียบ HR':t.currentTotal,'ยอดทบยกมา(ชม.)':t.carryIn,
       'เดือนยอดทบยกมา':t.carrySourceMonth||'','โอทีทั้งหมดรวมยอดทบ':t.total,'เบิกจริง':t.claimed,
-      'ทบเดือนหน้า(ชม.)':t.carry,'จำนวนเวร 8 ชม.':t.claimedUnits,'เวรที่จัดไม่ได้เพราะลา/ความจุ':t.unallocatedUnits,
+      'ทบเดือนหน้า(ชม.)':t.carry,'จำนวนเวร 8 ชม.':t.claimedUnits,'เวรที่จัดไม่ได้':t.unallocatedUnits,
       'คำนวณเป็นเงิน':t.money
     }));
   }
@@ -2992,12 +2993,12 @@
     special328Rows.forEach(x=>{const k=`${x.date}|${x.slot}`;if(!byCell.has(k))byCell.set(k,[]);byCell.get(k).push(`${x.nick} [328]`);});
     for(let w=0;w<weeks;w++){
       const dateRow=Array(cols).fill(null);dateRow[0]='วันที่';
-      const nameRows=Array.from({length:6},(_,i)=>{const r=Array(cols).fill(null);r[0]=String.fromCharCode(65+i);return r;});
+      const nameRows=Array.from({length:HR_DUMMY_SLOT_CAPACITY},(_,i)=>{const r=Array(cols).fill(null);r[0]=String.fromCharCode(65+i);return r;});
       for(let day=0;day<7;day++){
         const d=new Date(first);d.setDate(first.getDate()+w*7+day);const key=isoDate(d),c=1+day*3;
         if(key>=state.cycle.start&&key<=state.cycle.end){
           dateRow[c]=String(Number(key.slice(-2))).padStart(2,'0');
-          for(const slot of [0,8,16]){const names=byCell.get(`${key}|${slot}`)||[],col=c+(slot===0?0:slot===8?1:2);for(let i=0;i<Math.min(6,names.length);i++)nameRows[i][col]=names[i];}
+          for(const slot of [0,8,16]){const names=byCell.get(`${key}|${slot}`)||[],col=c+(slot===0?0:slot===8?1:2);for(let i=0;i<Math.min(HR_DUMMY_SLOT_CAPACITY,names.length);i++)nameRows[i][col]=names[i];}
         }
       }
       data.push(dateRow,...nameRows);
@@ -3057,6 +3058,7 @@
       carrySourceCycleKey:carryInfo.sourceCycleKey,carrySourceFound:carryInfo.found,carryOutByEmployeeCode,
       totalDummyRows:allocation.rows.length,totalClaimedHours:hrRound2(allocation.rows.length*8),
       dummyDailyMin:Number(allocation.dailyMin||0),dummyDailyMax:Number(allocation.dailyMax||0),dummyDailyCounts:allocation.dailyCounts||[],
+      dummySlotCapacity:Number(allocation.slotCapacity||HR_DUMMY_SLOT_CAPACITY),
       special328Dates:[...state.special328Dates],special328Rows:special328Rows.length,special328Pay:hrRound2(special328Rows.length*HR_SPECIAL_328.amountPer8h)
     };
     if(state.offline || !state.sb) return;
