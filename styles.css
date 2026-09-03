@@ -1256,3 +1256,54 @@ td{line-height:1.45}
       auto;
   }
 }
+
+
+/* V2.29 — เพิ่มผู้ใช้งานแบบ 2 บรรทัด */
+@media (min-width: 1050px){
+  .new-user-grid{
+    display:grid !important;
+    grid-template-columns:repeat(4,minmax(0,1fr)) !important;
+    gap:12px !important;
+    align-items:end !important;
+  }
+
+  .new-user-grid > label,
+  .new-user-grid > button{
+    min-width:0 !important;
+    width:100% !important;
+    box-sizing:border-box !important;
+  }
+
+  .new-user-grid input,
+  .new-user-grid select,
+  .new-user-grid .email-suffix-field,
+  .new-user-grid .create-active-toggle,
+  .new-user-grid #createUserBtn{
+    width:100% !important;
+    min-width:0 !important;
+    height:46px !important;
+    min-height:46px !important;
+    box-sizing:border-box !important;
+  }
+
+  .new-user-grid #createUserBtn{
+    white-space:nowrap !important;
+    align-self:end !important;
+  }
+
+  .new-user-grid .create-active-label{
+    min-width:0 !important;
+  }
+}
+
+@media (min-width: 650px) and (max-width: 1049px){
+  .new-user-grid{
+    grid-template-columns:repeat(2,minmax(0,1fr)) !important;
+  }
+}
+
+@media (max-width: 649px){
+  .new-user-grid{
+    grid-template-columns:1fr !important;
+  }
+}
