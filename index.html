@@ -7,13 +7,13 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="default" />
   <meta name="apple-mobile-web-app-title" content="LAB OT" />
-  <link rel="manifest" href="manifest.webmanifest?v=20260903-3" />
+  <link rel="manifest" href="manifest.webmanifest?v=20260903-4" />
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
   <title>LAB OT — LAB / Molec / Bacteria</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=20260903-v218" />
+  <link rel="stylesheet" href="styles.css?v=20260903-v219" />
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3EOT%3C/text%3E%3C/svg%3E">
   <style>
     /* Critical: author CSS (.center-shell { display:grid }) must not override HTML hidden state */
@@ -250,6 +250,25 @@
           </div>
           <div id="myAckEmpty" class="empty-state">กำลังโหลดรายการ…</div>
           <div id="managerAckList" class="ack-list"></div>
+        </section>
+
+        <section id="ownerStaffPreviewCard" class="card owner-preview-card" hidden>
+          <div class="section-head">
+            <div>
+              <h2>ตัวอย่าง OT ของเจ้าหน้าที่ทุกคน</h2>
+              <p>ใช้ตรวจว่าหน้า Staff ของแต่ละคนแสดงข้อมูลถูกต้องหรือไม่</p>
+            </div>
+            <button id="refreshOwnerPreviewBtn" class="secondary-btn" type="button">รีเฟรช</button>
+          </div>
+
+          <div id="ownerStaffPreviewEmpty" class="empty-state">กำลังโหลดตัวอย่าง…</div>
+          <div class="table-wrap"><table id="ownerStaffPreviewTable"></table></div>
+
+          <div class="owner-preview-detail">
+            <h3 id="ownerStaffPreviewTitle">ตัวอย่างหน้าจอ Staff</h3>
+            <div id="ownerStaffPreviewDetailEmpty" class="empty-state">เลือกเจ้าหน้าที่เพื่อดูตัวอย่าง</div>
+            <div id="ownerStaffPreviewList" class="ack-list owner-preview-list"></div>
+          </div>
         </section>
       </section>
 
@@ -496,7 +515,7 @@
     };
     window.PSC_OT_CONFIG = window.LAB_OT_CONFIG;
   </script>
-  <script src="app.js?v=20260903-19"></script>
+  <script src="app.js?v=20260903-20"></script>
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(console.warn));

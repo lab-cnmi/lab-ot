@@ -48,7 +48,9 @@
     resetUser: null,
     forcePasswordChange: false,
     installPrompt: null,
-    appLogs: []
+    appLogs: [],
+    ownerPreviewRows: [],
+    ownerPreviewStaffKey: ''
   };
 
   const $ = id => document.getElementById(id);
@@ -256,6 +258,7 @@
           loadManagerOwnAck(),
           loadManagedUsers()
         ]);
+        if(isOwnerAdmin()) loadOwnerStaffPreview();
         const savedView=sessionStorage.getItem('labot_view_role');
         applyViewRole(savedView==='staff'?'staff':'admin',{persist:false});
       } else {
@@ -535,7 +538,9 @@
   /* ===========================
      MANAGER — OWN ACKNOWLEDGEMENT
      =========================== */
-  function renderAckCards(rows, list, empty) {
+  function renderAckCards(rows, list, empty, options={}) {
+    const readOnly=!!options.readOnly;
+    const showPerson=!!options.showPerson;
     if(!list||!empty) return;
     const data=rows||[];
     if(!data.length){
@@ -553,7 +558,7 @@
       return `<article class="ack-person-card">
         <div class="ack-person-head">
           <div>
-            <div class="section-kicker">รอบ OT</div>
+            ${showPerson?`<div class="section-kicker">${esc(r.display_name||'เจ้าหน้าที่')}</div>`:`<div class="section-kicker">รอบ OT</div>`}
             <h2>${esc(fmtThaiRange(r.cycle_start,r.cycle_end))}</h2>
           </div>
           ${acknowledged
@@ -579,13 +584,17 @@
             </table>
           </div>
         </details>
-        ${acknowledged
-          ? `<div class="ack-confirmed">รับทราบเมื่อ ${esc(fmtDateTimeThai(r.acknowledged_at))}</div>`
-          : `<label class="ack-check">
-              <input type="checkbox" id="ackCheck_${esc(r.cycle_key)}">
-              <span>ข้าพเจ้าได้ตรวจสอบและรับทราบรายการ OT ของตนเองแล้ว</span>
-            </label>
-            <button class="primary-btn ack-submit-btn" type="button" data-ack-cycle="${esc(r.cycle_key)}">ยืนยันรับทราบ</button>`}
+        ${readOnly
+          ? `<div class="owner-preview-note">${acknowledged
+              ? `เจ้าหน้าที่รับทราบแล้ว ${esc(fmtDateTimeThai(r.acknowledged_at))}`
+              : `ตัวอย่างหน้าที่เจ้าหน้าที่จะเห็น · ยังรอรับทราบ`}</div>`
+          : (acknowledged
+              ? `<div class="ack-confirmed">รับทราบเมื่อ ${esc(fmtDateTimeThai(r.acknowledged_at))}</div>`
+              : `<label class="ack-check">
+                  <input type="checkbox" id="ackCheck_${esc(r.cycle_key)}">
+                  <span>ข้าพเจ้าได้ตรวจสอบและรับทราบรายการ OT ของตนเองแล้ว</span>
+                </label>
+                <button class="primary-btn ack-submit-btn" type="button" data-ack-cycle="${esc(r.cycle_key)}">ยืนยันรับทราบ</button>`)}
       </article>`;
     }).join('');
   }
@@ -600,6 +609,127 @@
       return;
     }
     renderAckCards(data||[], $('managerAckList'), $('myAckEmpty'));
+  }
+
+
+  function isOwnerAdmin() {
+    return String(state.session?.user?.email||'').toLowerCase()==='parichat.ink@mahidol.ac.th'
+      && state.actualRole==='admin';
+  }
+
+  async function loadOwnerStaffPreview() {
+    const card=$('ownerStaffPreviewCard');
+    const table=$('ownerStaffPreviewTable');
+    const empty=$('ownerStaffPreviewEmpty');
+    const previewList=$('ownerStaffPreviewList');
+    const previewEmpty=$('ownerStaffPreviewDetailEmpty');
+
+    if(!card || !table || !empty || !previewList || !previewEmpty) return;
+
+    if(!isOwnerAdmin()){
+      card.hidden=true;
+      table.innerHTML='';
+      previewList.innerHTML='';
+      return;
+    }
+
+    card.hidden=false;
+    empty.hidden=false;
+    empty.textContent='กำลังโหลดตัวอย่าง…';
+    table.innerHTML='';
+    previewList.innerHTML='';
+    previewEmpty.hidden=true;
+
+    try{
+      const {data,error}=await state.sb
+        .from('ot_acknowledgements')
+        .select('*')
+        .order('cycle_start',{ascending:false})
+        .order('display_name',{ascending:true});
+      if(error) throw error;
+
+      state.ownerPreviewRows=data||[];
+      if(!state.ownerPreviewRows.length){
+        empty.hidden=false;
+        empty.textContent='ยังไม่มีรอบ OT ที่บันทึกและส่งให้รับทราบ';
+        previewEmpty.hidden=false;
+        previewEmpty.textContent='เมื่อบันทึกรอบ OT แล้ว จะเลือกดูตัวอย่างของเจ้าหน้าที่แต่ละคนได้ที่นี่';
+        return;
+      }
+
+      const byStaff=new Map();
+      for(const row of state.ownerPreviewRows){
+        const key=String(row.staff_key||row.email||row.display_name||'');
+        if(!byStaff.has(key)) byStaff.set(key,[]);
+        byStaff.get(key).push(row);
+      }
+
+      const staff=[...byStaff.entries()].map(([key,rows])=>{
+        const latest=rows[0];
+        return {
+          key,
+          name:latest.display_name||'-',
+          employeeCode:latest.employee_code||'',
+          email:latest.email||'',
+          latest,
+          rows
+        };
+      }).sort((a,b)=>a.name.localeCompare(b.name,'th'));
+
+      empty.hidden=true;
+      table.innerHTML=`<thead><tr>
+        <th>ชื่อ</th>
+        <th class="num">OT ล่าสุด</th>
+        <th>สถานะ</th>
+        <th></th>
+      </tr></thead><tbody>${staff.map(s=>{
+        const status=s.latest.status==='acknowledged'
+          ? '<span class="ack-status done">✓ รับทราบแล้ว</span>'
+          : (s.latest.email
+              ? '<span class="ack-status pending">รอรับทราบ</span>'
+              : '<span class="ack-status neutral">ยังไม่มี Mahidol ID</span>');
+        return `<tr class="${state.ownerPreviewStaffKey===s.key?'owner-preview-selected':''}">
+          <td><b>${esc(s.name)}</b>${s.employeeCode?`<div class="subtle">${esc(s.employeeCode)}</div>`:''}</td>
+          <td class="num"><b>${Number(s.latest.ot_hours||0)}</b> ชม.</td>
+          <td>${status}</td>
+          <td><button class="secondary-btn compact" type="button" data-owner-preview="${esc(s.key)}">ดูตัวอย่าง</button></td>
+        </tr>`;
+      }).join('')}</tbody>`;
+
+      if(!state.ownerPreviewStaffKey || !byStaff.has(state.ownerPreviewStaffKey)){
+        state.ownerPreviewStaffKey=staff[0]?.key||'';
+      }
+      renderOwnerStaffPreviewDetail();
+    }catch(err){
+      console.error('load owner staff preview',err);
+      empty.hidden=false;
+      empty.textContent='เปิดตัวอย่าง OT ของเจ้าหน้าที่ไม่ได้';
+      previewEmpty.hidden=false;
+      previewEmpty.textContent='กรุณาลองรีเฟรชอีกครั้ง';
+    }
+  }
+
+  function renderOwnerStaffPreviewDetail() {
+    const list=$('ownerStaffPreviewList');
+    const empty=$('ownerStaffPreviewDetailEmpty');
+    const title=$('ownerStaffPreviewTitle');
+    if(!list||!empty||!isOwnerAdmin()) return;
+
+    const rows=(state.ownerPreviewRows||[]).filter(r=>
+      String(r.staff_key||r.email||r.display_name||'')===String(state.ownerPreviewStaffKey||'')
+    );
+
+    if(!rows.length){
+      list.innerHTML='';
+      empty.hidden=false;
+      empty.textContent='เลือกเจ้าหน้าที่เพื่อดูตัวอย่าง';
+      if(title) title.textContent='ตัวอย่างหน้าจอ Staff';
+      return;
+    }
+
+    empty.hidden=true;
+    if(title) title.textContent=`ตัวอย่างหน้าจอ Staff · ${rows[0].display_name||''}`;
+    renderAckCards(rows,list,empty,{readOnly:true,showPerson:false});
   }
 
   /* ===========================
@@ -841,6 +971,15 @@
     $('adminResetPasswordCancelBtn')?.addEventListener('click', closeResetUserPassword);
     $('adminResetPasswordCloseBtn')?.addEventListener('click', closeResetUserPassword);
     $('adminResetPasswordModal')?.addEventListener('click',e=>{if(e.target===$('adminResetPasswordModal'))closeResetUserPassword();});
+    $('ownerStaffPreviewTable')?.addEventListener('click',e=>{
+      const btn=e.target.closest('[data-owner-preview]');
+      if(!btn) return;
+      state.ownerPreviewStaffKey=btn.dataset.ownerPreview;
+      renderOwnerStaffPreviewDetail();
+      document.querySelectorAll('#ownerStaffPreviewTable tbody tr').forEach(tr=>tr.classList.remove('owner-preview-selected'));
+      btn.closest('tr')?.classList.add('owner-preview-selected');
+    });
+    $('refreshOwnerPreviewBtn')?.addEventListener('click',loadOwnerStaffPreview);
     $('managerAckList')?.addEventListener('click', e=>{
       const btn=e.target.closest('[data-ack-cycle]');
       if(btn) acknowledgeOwnCycle(btn.dataset.ackCycle);
@@ -907,7 +1046,7 @@
     document.querySelectorAll('.tab-panel').forEach(x => x.classList.toggle('active', x.id === `tab-${name}`));
     if (name === 'history') loadHistory();
     if (name === 'users') loadManagedUsers();
-    if (name === 'myack') loadManagerOwnAck();
+    if (name === 'myack') { loadManagerOwnAck(); if(isOwnerAdmin()) loadOwnerStaffPreview(); }
     if (name === 'log') loadAppLogs('admin');
   }
 
