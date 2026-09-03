@@ -303,3 +303,18 @@ td{line-height:1.45}
 @media(max-width:700px){
   .count-badge{display:inline-flex;margin-left:4px;margin-top:4px}
 }
+
+
+/* V2.9 — real Admin / Staff role switch */
+.view-mode-btn.staff-preview-active{
+  background:#ffffff;
+  border-color:#d9e4eb;
+  color:#355e75;
+}
+.view-mode-option{
+  min-height:44px;
+}
+.view-mode-option b{
+  font-size:14px;
+  font-weight:600;
+}

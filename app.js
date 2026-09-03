@@ -155,23 +155,43 @@
   function applyViewRole(role, {persist=true}={}) {
     if (state.actualRole !== 'admin') role = state.actualRole || 'staff';
     state.viewRole = role === 'staff' ? 'staff' : 'admin';
+
+    // ใช้ role ที่เลือกจริงกับหน้าแอป เพื่อให้ Admin ทดสอบแบบ Staff ได้เหมือน Staff login
+    state.role = state.viewRole;
     document.body.dataset.viewRole = state.viewRole;
-    const isStaffPreview = state.actualRole === 'admin' && state.viewRole === 'staff';
+
     const wrap = $('viewModeWrap');
     const menu = $('viewModeMenu');
     const btn = $('viewModeBtn');
     const label = $('viewModeBtnLabel');
-    const banner = $('staffPreviewBanner');
+
     if (wrap) wrap.hidden = state.actualRole !== 'admin';
-    if (label) label.textContent = state.viewRole === 'staff' ? 'มุมมอง Staff' : 'มุมมอง Admin';
-    if (banner) banner.hidden = !isStaffPreview;
-    if (btn) btn.classList.toggle('staff-preview-active', isStaffPreview);
-    document.querySelectorAll('[data-admin-only]').forEach(el => { el.hidden = state.viewRole !== 'admin'; });
-    document.querySelectorAll('[data-staff-only]').forEach(el => { el.hidden = state.viewRole !== 'staff'; });
-    document.querySelectorAll('.view-mode-option').forEach(el => el.classList.toggle('active', el.dataset.viewRole === state.viewRole));
+    if (label) label.textContent = state.viewRole === 'staff' ? 'Staff' : 'Admin';
+
+    document.querySelectorAll('[data-admin-only]').forEach(el => {
+      el.hidden = state.role !== 'admin';
+    });
+    document.querySelectorAll('[data-staff-only]').forEach(el => {
+      el.hidden = state.role !== 'staff';
+    });
+    document.querySelectorAll('.view-mode-option').forEach(el => {
+      el.classList.toggle('active', el.dataset.viewRole === state.viewRole);
+    });
+
+    // ป้ายผู้ใช้แสดง role ที่กำลังใช้งานจริง ไม่ใช้คำว่า preview / มุมมอง
+    const email = String(state.session?.user?.email || '');
+    if ($('loginBadge') && state.actualRole === 'admin') {
+      $('loginBadge').textContent = `${state.role === 'staff' ? 'Staff' : 'Admin'} · ${email}`;
+    }
+
     if (menu) menu.hidden = true;
     if (btn) btn.setAttribute('aria-expanded', 'false');
-    if (persist && state.actualRole === 'admin') sessionStorage.setItem('labot_view_role', state.viewRole);
+
+    if (persist && state.actualRole === 'admin') {
+      sessionStorage.setItem('labot_view_role', state.viewRole);
+    }
+
+    recompute();
   }
 
   function toggleViewModeMenu() {
@@ -197,14 +217,13 @@
     showOnly('appView');
     const savedView = info.role === 'admin' ? sessionStorage.getItem('labot_view_role') : 'staff';
     applyViewRole(savedView === 'staff' ? 'staff' : info.role, {persist:false});
-    renderSpecialRateAdmin();
     await Promise.all([loadHistory(), loadSpecial328Settings()]);
   }
 
   function enterOffline() {
-    state.offline = true; state.role = 'demo'; state.actualRole = 'demo'; state.viewRole = 'staff'; state.session = { user:{ email:'โหมดทดสอบ' } };
+    state.offline = true; state.role = 'staff'; state.actualRole = 'demo'; state.viewRole = 'staff'; state.session = { user:{ email:'โหมดทดสอบ' } };
     $('loginBadge').textContent = 'โหมดทดสอบ · ไม่บันทึกฐานข้อมูล';
-    showOnly('appView'); applyViewRole('staff', {persist:false}); renderSpecialRateAdmin(); recompute();
+    showOnly('appView'); applyViewRole('staff', {persist:false}); recompute();
   }
 
   async function login(e) {

@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=20260903-leaves1" />
+  <link rel="stylesheet" href="styles.css?v=20260903-role1" />
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3EOT%3C/text%3E%3C/svg%3E">
   <style>
     /* Critical: author CSS (.center-shell { display:grid }) must not override HTML hidden state */
@@ -58,14 +58,14 @@
         <span id="loginBadge" class="user-badge"></span>
         <div id="viewModeWrap" class="view-mode-wrap" hidden>
           <button id="viewModeBtn" class="view-mode-btn" type="button" aria-haspopup="true" aria-expanded="false">
-            <span id="viewModeBtnLabel">มุมมอง Admin</span><span class="chevron">⌄</span>
+            <span id="viewModeBtnLabel">Admin</span><span class="chevron">⌄</span>
           </button>
           <div id="viewModeMenu" class="view-mode-menu" hidden>
             <button type="button" class="view-mode-option" data-view-role="admin">
-              <b>มุมมอง Admin</b><span>หน้าที่มัสใช้งานตามปกติ</span>
+              <b>Admin</b>
             </button>
             <button type="button" class="view-mode-option" data-view-role="staff">
-              <b>มุมมอง Staff</b><span>ดูหน้าจอแบบที่มายเห็น</span>
+              <b>Staff</b>
             </button>
           </div>
         </div>
@@ -78,12 +78,6 @@
       <button class="tab" data-tab="history">รอบที่บันทึกไว้</button>
       <button class="tab" data-tab="guide">วิธีใช้ทุกเดือน</button>
     </nav>
-
-    <div id="staffPreviewBanner" class="staff-preview-banner" hidden>
-      <b>กำลังดูหน้าจอแบบ Staff</b>
-      <span>บัญชีจริงของมัสยังเป็น Admin</span>
-    </div>
-
     <main class="page-shell">
       <section id="tab-work" class="tab-panel active">
         <section class="cycle-card">
@@ -259,6 +253,6 @@
     };
     window.PSC_OT_CONFIG = window.LAB_OT_CONFIG;
   </script>
-  <script src="app.js?v=20260903-11"></script>
+  <script src="app.js?v=20260903-12"></script>
 </body>
 </html>
