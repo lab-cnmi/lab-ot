@@ -542,6 +542,7 @@
     const readOnly=!!options.readOnly;
     const showPerson=!!options.showPerson;
     if(!list||!empty) return;
+
     const data=rows||[];
     if(!data.length){
       empty.hidden=false;
@@ -549,13 +550,75 @@
       list.innerHTML='';
       return;
     }
+
+    const dateChips=(dates,kind='neutral')=>{
+      if(!dates?.length) return '<span class="ack-none">ไม่มี</span>';
+      return `<div class="ack-date-chips">${dates.map(d=>`<span class="ack-date-chip ${kind}">${esc(fmtThaiDate(d))}</span>`).join('')}</div>`;
+    };
+
     empty.hidden=true;
     list.innerHTML=data.map(r=>{
       const d=r.detail_json||{};
       const assignments=Array.isArray(d.assignments)?d.assignments:[];
+      const hp=d.hrPlan||{};
+      const claims=Array.isArray(hp.claims)?hp.claims:[];
+      const leaveDates=Array.isArray(hp.leaveDates)?hp.leaveDates:[];
+      const skippedDates=Array.isArray(hp.skippedDates)?hp.skippedDates:[];
+      const issues=Array.isArray(hp.verifyIssues)?hp.verifyIssues:[];
       const acknowledged=r.status==='acknowledged';
-      const specialCount=Number(d.special328Count||0);
-      return `<article class="ack-person-card">
+      const specialCount=Number(hp.special328Count ?? d.special328Count ?? 0);
+      const hasNewPlan=!!d.hrPlan;
+
+      const actualTable=assignments.length
+        ? `<div class="table-wrap ack-check-table"><table>
+            <thead><tr><th>วันที่อยู่เวรจริง</th><th>หน่วย</th><th>เวร</th><th>เวลา</th><th class="num">ชม.</th></tr></thead>
+            <tbody>${assignments.map(a=>`<tr>
+              <td><b>${esc(fmtThaiDate(a.date))}</b></td>
+              <td>${esc(a.unit)}</td>
+              <td>${esc(a.duty)}</td>
+              <td>${esc(a.time)}</td>
+              <td class="num"><b>${Number(a.hours||0)}</b></td>
+            </tr>`).join('')}</tbody>
+          </table></div>`
+        : '<div class="empty-state compact-empty">ไม่พบเวรจริงในรอบนี้</div>';
+
+      const hrTable=claims.length
+        ? `<div class="table-wrap ack-check-table"><table>
+            <thead><tr><th>วันที่เบิก HR</th><th>เวลาเข้า</th><th>เวลาออก</th><th>รายการ</th><th>รหัส</th></tr></thead>
+            <tbody>${claims.map(c=>`<tr>
+              <td><b>${esc(fmtThaiDate(c.date))}</b></td>
+              <td>${esc(c.start||'-')}</td>
+              <td>${esc(c.end||'-')}</td>
+              <td>${esc(c.claimKind||'OT')}</td>
+              <td><span class="claim-code">${esc(c.claimCode||'-')}</span></td>
+            </tr>`).join('')}</tbody>
+          </table></div>`
+        : '<div class="empty-state compact-empty">ยังไม่มีรายการในตารางเบิก HR</div>';
+
+      const verifyOk=hasNewPlan && hp.verifyOk!==false && issues.length===0;
+      const verifyBox=hasNewPlan
+        ? `<div class="ack-verify-box ${verifyOk?'ok':'warn'}">
+            <div class="ack-verify-head">
+              <b>${verifyOk?'✓ ระบบตรวจแล้ว':'⚠ มีจุดที่ต้องตรวจ'}</b>
+              <span>${verifyOk?'ยอดชั่วโมงและวันลาสอดคล้องกับตารางที่ระบบจัด':'กรุณาตรวจรายการด้านล่างก่อนรับทราบ'}</span>
+            </div>
+            <div class="ack-verify-metrics">
+              <div><span>OT จริง</span><b>${Number(d.totalHours||r.ot_hours||0)} ชม.</b></div>
+              <div><span>ยอดยกมา</span><b>${Number(hp.carryIn||0)} ชม.</b></div>
+              <div><span>เบิก HR</span><b>${Number(hp.claimedHours||0)} ชม.</b></div>
+              <div><span>ทบเดือนหน้า</span><b>${Number(hp.carryOut||0)} ชม.</b></div>
+              ${specialCount?`<div><span>00000328</span><b>${specialCount} ครั้ง</b></div>`:''}
+            </div>
+            ${issues.length?`<div class="ack-verify-issues">${issues.map(x=>`<div>• ${esc(x)}</div>`).join('')}</div>`:''}
+          </div>`
+        : `<div class="ack-verify-box warn">
+            <div class="ack-verify-head">
+              <b>รอบนี้ยังเป็นข้อมูลแบบเดิม</b>
+              <span>ให้ผู้ทำ OT เปิดรอบนี้แล้วกด “ยืนยันและบันทึกรอบนี้” อีกครั้ง เพื่อสร้างตารางตรวจสอบก่อนรับทราบ</span>
+            </div>
+          </div>`;
+
+      return `<article class="ack-person-card ack-review-card">
         <div class="ack-person-head">
           <div>
             ${showPerson?`<div class="section-kicker">${esc(r.display_name||'เจ้าหน้าที่')}</div>`:`<div class="section-kicker">รอบ OT</div>`}
@@ -565,36 +628,69 @@
             ? `<span class="ack-status done">✓ รับทราบแล้ว</span>`
             : `<span class="ack-status pending">รอรับทราบ</span>`}
         </div>
+
         <div class="ack-metrics">
           <div><span>OT รวม</span><b>${Number(r.ot_hours||0).toLocaleString('th-TH')} ชม.</b></div>
           <div><span>LAB</span><b>${Number(d.unitHours?.LAB||0)}</b></div>
           <div><span>Molec</span><b>${Number(d.unitHours?.Molec||0)}</b></div>
           <div><span>Bacteria</span><b>${Number(d.unitHours?.Bacteria||0)}</b></div>
-          ${specialCount?`<div><span>00000328</span><b>${specialCount} ครั้ง</b></div>`:''}
         </div>
-        <details class="ack-details">
-          <summary>ดูรายละเอียดเวร ${assignments.length} รายการ</summary>
-          <div class="table-wrap">
-            <table>
-              <thead><tr><th>วันที่</th><th>หน่วย</th><th>เวร</th><th>เวลา</th><th class="num">ชม.</th></tr></thead>
-              <tbody>${assignments.map(a=>`<tr>
-                <td>${esc(fmtThaiDate(a.date))}</td><td>${esc(a.unit)}</td><td>${esc(a.duty)}</td>
-                <td>${esc(a.time)}</td><td class="num">${Number(a.hours||0)}</td>
-              </tr>`).join('')}</tbody>
-            </table>
+
+        ${verifyBox}
+
+        <section class="ack-review-section">
+          <div class="ack-review-title">
+            <span class="ack-review-no">1</span>
+            <div><h3>ตารางเวรจริงของฉัน</h3><p>วันที่และเวรที่อ่านมาจากไฟล์ตารางเวรของหน่วย</p></div>
           </div>
-        </details>
+          ${actualTable}
+        </section>
+
+        <section class="ack-review-section">
+          <div class="ack-review-title">
+            <span class="ack-review-no">2</span>
+            <div>
+              <h3>ตารางที่ระบบจัดเบิก HR</h3>
+              <p>ใช้ตรวจวันที่และเวลาในตารางเบิก HR ซึ่งอาจไม่ใช่วันเดียวกับวันที่อยู่เวรจริง</p>
+            </div>
+          </div>
+          ${hrTable}
+        </section>
+
+        <section class="ack-review-section">
+          <div class="ack-review-title">
+            <span class="ack-review-no">3</span>
+            <div><h3>วันที่ระบบเว้นและวันลา</h3><p>ใช้ดูว่าระบบเว้นวันให้ตรงกับวันที่ไม่ควรนำไปจัดเบิกหรือไม่</p></div>
+          </div>
+
+          <div class="ack-day-groups">
+            <div class="ack-day-group">
+              <b>วันลาที่ระบบใช้หลบ</b>
+              ${dateChips(leaveDates,'leave')}
+            </div>
+            <div class="ack-day-group">
+              <b>วันที่ไม่มีรายการเบิก HR</b>
+              ${dateChips(skippedDates,'rest')}
+            </div>
+          </div>
+        </section>
+
         ${readOnly
           ? `<div class="owner-preview-note">${acknowledged
               ? `เจ้าหน้าที่รับทราบแล้ว ${esc(fmtDateTimeThai(r.acknowledged_at))}`
-              : `ตัวอย่างหน้าที่เจ้าหน้าที่จะเห็น · ยังรอรับทราบ`}</div>`
+              : `ตัวอย่างหน้าที่เจ้าหน้าที่จะเห็น · มัสตรวจดูได้ แต่กดรับทราบแทนไม่ได้`}</div>`
           : (acknowledged
               ? `<div class="ack-confirmed">รับทราบเมื่อ ${esc(fmtDateTimeThai(r.acknowledged_at))}</div>`
-              : `<label class="ack-check">
-                  <input type="checkbox" id="ackCheck_${esc(r.cycle_key)}">
-                  <span>ข้าพเจ้าได้ตรวจสอบและรับทราบรายการ OT ของตนเองแล้ว</span>
-                </label>
-                <button class="primary-btn ack-submit-btn" type="button" data-ack-cycle="${esc(r.cycle_key)}">ยืนยันรับทราบ</button>`)}
+              : (hasNewPlan
+                  ? `<div class="ack-final-confirm">
+                      <b>ตรวจครบแล้วจึงกดรับทราบ</b>
+                      <label class="ack-check">
+                        <input type="checkbox" id="ackCheck_${esc(r.cycle_key)}">
+                        <span>ข้าพเจ้าได้ตรวจตารางเวรจริง ตารางเบิก HR และวันที่ระบบเว้นแล้ว และรับทราบรายการของตนเอง</span>
+                      </label>
+                      <button class="primary-btn ack-submit-btn" type="button" data-ack-cycle="${esc(r.cycle_key)}">ยืนยันรับทราบ</button>
+                    </div>`
+                  : `<div class="owner-preview-note">ยังไม่สามารถรับทราบรอบนี้ได้ จนกว่าผู้ทำ OT จะบันทึกรอบใหม่ด้วยระบบเวอร์ชันล่าสุด</div>`))}
       </article>`;
     }).join('');
   }
@@ -1430,7 +1526,33 @@
     return buildSummary(allAssignments()).map(r => ({ ...r, identity:staffIdentity(r.name) }));
   }
 
-  function ackDetailFor(summaryRow) {
+  async function buildAckHrPlan() {
+    const assignments=allAssignments()
+      .slice()
+      .sort((a,b)=>a.date.localeCompare(b.date)||a.name.localeCompare(b.name,'th')||a.unit.localeCompare(b.unit));
+
+    const holidaySet=hrHolidayDates(assignments);
+    const carryInfo=await hrCarryInInfo();
+    const totals=hrBuildTotals(assignments,carryInfo);
+
+    const specialEligibility=buildSpecial328Eligibility(assignments);
+    const special328=hrAllocateSpecial328(specialEligibility);
+    const allocation=hrAllocate(totals,holidaySet,special328.rows);
+
+    const byCode=new Map();
+    for(const t of totals){
+      byCode.set(t.employeeCode,{
+        total:t,
+        normalClaims:allocation.rows.filter(x=>x.employeeCode===t.employeeCode),
+        specialClaims:special328.rows.filter(x=>x.employeeCode===t.employeeCode),
+        leaveDates:allocation.leaveSkipped.filter(x=>x.employeeCode===t.employeeCode).map(x=>x.date),
+        specialFailure:special328.failures.find(x=>String(x).startsWith(`${t.nick}:`))||''
+      });
+    }
+    return {assignments,holidaySet,carryInfo,totals,special328,allocation,byCode};
+  }
+
+  function ackDetailFor(summaryRow,hrPlan=null) {
     const key=normName(summaryRow.name);
     const assignments=allAssignments()
       .filter(a=>normName(a.name)===key)
@@ -1439,20 +1561,82 @@
         date:a.date,unit:a.unit,duty:a.duty,time:a.timeLabel,hours:a.hours
       }));
 
-    const special = buildSpecial328Eligibility(allAssignments())
-      .find(x=>x.employeeCode && x.employeeCode===summaryRow.identity.employeeCode);
-    const specialCount = special?.selected ? Number(special.units||0) : 0;
+    const employeeCode=summaryRow.identity.employeeCode;
+    const p=hrPlan?.byCode?.get(employeeCode)||null;
+    const t=p?.total||null;
+
+    const normalClaims=(p?.normalClaims||[]).map(x=>({
+      date:x.date,start:x.start,end:x.end,hours:8,
+      claimCode:x.claimCode,
+      claimKind:x.type===2?'OT วันหยุด':'OT ปกติ'
+    }));
+    const specialClaims=(p?.specialClaims||[]).map(x=>({
+      date:x.date,start:x.start,end:x.end,hours:8,
+      claimCode:x.claimCode,
+      claimKind:'00000328',
+      sourceDate:x.sourceDate||'',
+      sourceUnit:x.sourceUnit||'',
+      sourceDuty:x.sourceDuty||'',
+      sourceTime:x.sourceTime||''
+    }));
+    const hrClaims=[...normalClaims,...specialClaims]
+      .sort((a,b)=>a.date.localeCompare(b.date)||a.start.localeCompare(b.start)||a.claimCode.localeCompare(b.claimCode));
+
+    const leaveDates=[...new Set(p?.leaveDates||[])].sort();
+    const leaveSet=new Set(leaveDates);
+    const claimDateSet=new Set(hrClaims.map(x=>x.date));
+    const skippedDates=hrDateList(state.cycle.start,state.cycle.end)
+      .filter(d=>!claimDateSet.has(d) && !leaveSet.has(d));
+    const leaveConflictDates=[...new Set(hrClaims.filter(x=>leaveSet.has(x.date)).map(x=>x.date))].sort();
+
+    const normalClaimHours=normalClaims.length*8;
+    const specialCount=specialClaims.length;
+    const carryIn=Number(t?.carryIn||0);
+    const carryOut=Number(t?.carry||0);
+    const totalForHr=Number(t?.total ?? summaryRow.hours ?? 0);
+    const claimedHours=Number(t?.claimed ?? normalClaimHours);
+    const balanceOk=Math.abs(totalForHr-(claimedHours+carryOut))<0.01;
+    const unallocatedUnits=Number(t?.unallocatedUnits||0);
+    const specialFailure=String(p?.specialFailure||'');
+    const verifyIssues=[];
+    if(!balanceOk) verifyIssues.push('ยอดชั่วโมงยังไม่สมดุล');
+    if(unallocatedUnits>0) verifyIssues.push(`ยังมี ${unallocatedUnits*8} ชม. ที่จัดลงตาราง HR ไม่ได้`);
+    if(leaveConflictDates.length) verifyIssues.push('มีรายการเบิก HR ตรงกับวันลา');
+    if(specialFailure) verifyIssues.push('สิทธิ์ 00000328 ยังจัดไม่ครบ');
 
     return {
       cycle:{start:state.cycle.start,end:state.cycle.end},
       name:summaryRow.identity.displayName,
-      employeeCode:summaryRow.identity.employeeCode,
+      employeeCode,
       unitHours:{LAB:summaryRow.LAB||0,Molec:summaryRow.Molec||0,Bacteria:summaryRow.Bacteria||0},
       totalHours:summaryRow.hours||0,
       assignmentCount:summaryRow.count||0,
+      assignments,
+
+      hrPlan:{
+        normalClaims,
+        specialClaims,
+        claims:hrClaims,
+        normalClaimHours,
+        special328Count:specialCount,
+        special328Amount:specialCount*240,
+        carryIn,
+        carryOut,
+        totalForHr,
+        claimedHours,
+        leaveDates,
+        skippedDates,
+        leaveConflictDates,
+        unallocatedUnits,
+        specialFailure,
+        balanceOk,
+        verifyOk:verifyIssues.length===0,
+        verifyIssues
+      },
+
+      // compatibility with old UI/export
       special328Count:specialCount,
-      special328Amount:specialCount*240,
-      assignments
+      special328Amount:specialCount*240
     };
   }
 
@@ -1600,6 +1784,7 @@
     const summary=ackManagerSummary();
     if(!summary.length) return;
 
+    const hrPlan=await buildAckHrPlan();
     const cycleKey=currentCycleKey();
     const {data:existing,error:readError}=await state.sb.from('ot_acknowledgements').select('*').eq('cycle_key',cycleKey);
     if(readError) throw readError;
@@ -1611,7 +1796,7 @@
       const id=r.identity;
       const person=state.ackPeople[id.staffKey]||{};
       const email=String(person.email||'').trim().toLowerCase()||null;
-      const detail=ackDetailFor(r);
+      const detail=ackDetailFor(r,hrPlan);
       const hash=await sha256Hex(JSON.stringify(detail));
       const old=existingMap.get(id.staffKey);
       const unchanged=!!old && old.detail_hash===hash && String(old.email||'')===String(email||'');
@@ -2395,6 +2580,15 @@
       const carry=hrRound2(totals.reduce((s,t)=>s+t.carry,0));
       toast(`Export HR สำเร็จ • OT ปกติ MT 130 จำนวน ${allocation.rows.length} เวร × 8 ชม. • 00000328 ${special328.rows.length} ครั้ง = ${(special328.rows.length*HR_SPECIAL_328.amountPer8h).toLocaleString('th-TH')} บาท • ทบเดือนหน้า ${carry} ชม.`);
       await writeAppLog('export_hr','Export HR Excel',`${allocation.rows.length} ช่วง OT · 00000328 ${special328.rows.length} ครั้ง`,'',currentCycleKey());
+      if(state.snapshotAt){
+        try{
+          await syncAckRequests();
+          await loadManagerOwnAck();
+          if(isOwnerAdmin()) await loadOwnerStaffPreview();
+        }catch(ackErr){
+          console.warn('refresh acknowledgement after HR export',ackErr);
+        }
+      }
     } catch(err) {
       console.error('HR export failed',err);toast(`Export HR ไม่สำเร็จ: ${err.message||err}`);
     } finally {

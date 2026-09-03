@@ -764,3 +764,168 @@ td{line-height:1.45}
   text-align:right;
   white-space:nowrap;
 }
+
+
+/* V2.20 — acknowledgement verifies actual roster vs HR claim schedule */
+.ack-review-card{
+  padding:22px;
+}
+.ack-verify-box{
+  margin:16px 0 20px;
+  padding:14px;
+  border-radius:14px;
+  border:1px solid;
+}
+.ack-verify-box.ok{
+  background:#eef8f3;
+  border-color:#cce7d8;
+  color:#285f48;
+}
+.ack-verify-box.warn{
+  background:#fff8e9;
+  border-color:#efd9a7;
+  color:#765318;
+}
+.ack-verify-head{
+  display:flex;
+  flex-direction:column;
+  gap:2px;
+}
+.ack-verify-head b{font-size:15px}
+.ack-verify-head span{font-size:13px}
+.ack-verify-metrics{
+  display:flex;
+  flex-wrap:wrap;
+  gap:8px;
+  margin-top:12px;
+}
+.ack-verify-metrics>div{
+  min-width:112px;
+  padding:8px 10px;
+  border-radius:10px;
+  background:rgba(255,255,255,.62);
+}
+.ack-verify-metrics span{
+  display:block;
+  font-size:11px;
+  opacity:.78;
+}
+.ack-verify-metrics b{
+  display:block;
+  margin-top:1px;
+  font-size:15px;
+}
+.ack-verify-issues{
+  margin-top:10px;
+  font-size:13px;
+  font-weight:600;
+}
+.ack-review-section{
+  margin-top:18px;
+  padding-top:18px;
+  border-top:1px solid #e5ebef;
+}
+.ack-review-title{
+  display:flex;
+  gap:10px;
+  align-items:flex-start;
+  margin-bottom:10px;
+}
+.ack-review-no{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  width:28px;
+  height:28px;
+  flex:0 0 28px;
+  border-radius:9px;
+  background:#eaf4f8;
+  color:#247293;
+  font-weight:700;
+}
+.ack-review-title h3{
+  margin:0;
+  font-size:16px;
+  font-weight:700;
+}
+.ack-review-title p{
+  margin:2px 0 0;
+  color:#718493;
+  font-size:12px;
+}
+.ack-check-table table{
+  min-width:650px;
+}
+.ack-check-table th{
+  background:#f5f8fa;
+}
+.claim-code{
+  display:inline-flex;
+  padding:4px 7px;
+  border-radius:7px;
+  background:#f0f4f6;
+  font-size:12px;
+  font-weight:600;
+  color:#526d7f;
+}
+.ack-day-groups{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:12px;
+}
+.ack-day-group{
+  padding:12px;
+  border:1px solid #e1e8ed;
+  border-radius:12px;
+  background:#fafcfd;
+}
+.ack-day-group>b{
+  display:block;
+  margin-bottom:8px;
+  font-size:13px;
+}
+.ack-date-chips{
+  display:flex;
+  flex-wrap:wrap;
+  gap:5px;
+}
+.ack-date-chip{
+  display:inline-flex;
+  padding:5px 8px;
+  border-radius:999px;
+  font-size:11px;
+  font-weight:600;
+}
+.ack-date-chip.leave{
+  background:#fff0e5;
+  color:#96511c;
+}
+.ack-date-chip.rest{
+  background:#edf4f7;
+  color:#5a7181;
+}
+.ack-none{
+  color:#8999a5;
+  font-size:12px;
+}
+.ack-final-confirm{
+  margin-top:20px;
+  padding:15px;
+  border-radius:14px;
+  background:#f3f8fb;
+  border:1px solid #d9e8ef;
+}
+.ack-final-confirm>b{
+  display:block;
+  margin-bottom:7px;
+  font-size:15px;
+}
+.compact-empty{
+  padding:12px!important;
+  min-height:0!important;
+}
+@media(max-width:720px){
+  .ack-day-groups{grid-template-columns:1fr}
+  .ack-review-card{padding:15px}
+  .ack-verify-metrics>div{min-width:95px}
+}

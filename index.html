@@ -7,13 +7,13 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="default" />
   <meta name="apple-mobile-web-app-title" content="LAB OT" />
-  <link rel="manifest" href="manifest.webmanifest?v=20260903-4" />
+  <link rel="manifest" href="manifest.webmanifest?v=20260903-5" />
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
   <title>LAB OT — LAB / Molec / Bacteria</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=20260903-v219" />
+  <link rel="stylesheet" href="styles.css?v=20260903-v220" />
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3EOT%3C/text%3E%3C/svg%3E">
   <style>
     /* Critical: author CSS (.center-shell { display:grid }) must not override HTML hidden state */
@@ -421,8 +421,9 @@
           <h2>วิธีใช้</h2>
           <ol class="guide-steps">
             <li><b>เปิด “OT ของฉัน”</b><span>เลือกดูรอบ OT และเปิดรายละเอียดเวรของตนเอง</span></li>
-            <li><b>ตรวจรายการ</b><span>เช็กวันที่ หน่วย เวร เวลา และจำนวนชั่วโมงให้ถูกต้อง</span></li>
-            <li><b>กดยืนยันรับทราบ</b><span>ติ๊กข้อความรับทราบ แล้วกด “ยืนยันรับทราบ”</span></li>
+            <li><b>ตรวจเวรจริง</b><span>เช็กวันที่ หน่วย เวร เวลา และจำนวนชั่วโมงของตนเอง</span></li>
+            <li><b>ตรวจตารางเบิก HR</b><span>ดูวันที่ เวลาเข้า-ออก และวันที่ระบบเว้น รวมถึงวันลาที่ระบบใช้หลบ</span></li>
+            <li><b>กดยืนยันรับทราบ</b><span>เมื่อเวรจริง ตารางเบิก HR และวันที่ระบบเว้นถูกต้องแล้ว จึงติ๊กและกด “ยืนยันรับทราบ”</span></li>
             <li><b>ถ้าข้อมูลถูกแก้ภายหลัง</b><span>ระบบจะให้รับทราบใหม่เฉพาะรอบที่ข้อมูลของคุณเปลี่ยน</span></li>
             <li><b>เปลี่ยนรหัสผ่าน</b><span>กดปุ่ม “เปลี่ยนรหัสผ่าน” ด้านบนได้ตลอด</span></li>
           </ol>
@@ -515,7 +516,7 @@
     };
     window.PSC_OT_CONFIG = window.LAB_OT_CONFIG;
   </script>
-  <script src="app.js?v=20260903-20"></script>
+  <script src="app.js?v=20260903-21"></script>
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(console.warn));
