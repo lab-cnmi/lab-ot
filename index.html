@@ -140,7 +140,7 @@
             <div class="section-head">
               <div><h2>สรุปรวมรายคน</h2><p>รวมคนชื่อเดียวกันจากทุกหน่วยเป็นยอดเดียว และยังแยกดูยอดรายหน่วยได้</p></div>
               <div class="actions">
-                <button id="exportBtn" class="secondary-btn" disabled>Export Excel</button>
+                <button id="exportBtn" class="secondary-btn" disabled>Export HR Excel</button>
                 <button id="saveBtn" class="primary-btn" disabled>ยืนยันและบันทึกรอบนี้</button>
               </div>
             </div>
@@ -176,7 +176,7 @@
             <li><b>กด “ดึงวันลาล่าสุด”</b><span>ระบบไปอ่าน Calendar สดที่ Admin เชื่อมไว้ ไม่ต้องดาวน์โหลด .ics เอง</span></li>
             <li><b>ตรวจคำเตือน</b><span>ถ้าชื่อเดียวกันมีเวรและมีรายการใน Calendar วันเดียวกัน ให้ตรวจว่ามีเปลี่ยนเวร/มาทำจริงหรือไม่</span></li>
             <li><b>กดยืนยัน</b><span>ระบบเก็บ Snapshot ของ Excel ทั้ง 3 หน่วย + Calendar ณ เวลานั้นไว้</span></li>
-            <li><b>Export Excel</b><span>ได้สรุปรวมรายคน, แยกหน่วย, รายละเอียดเวร, รายการเตือน และรายการ Calendar</span></li>
+            <li><b>Export HR Excel</b><span>สร้างไฟล์ HR dummy แบบเดียวกับระบบ CNMI เป็นช่วงละ 8 ชั่วโมง พร้อมหลบวันลาและบันทึกยอดทบ</span></li>
           </ol>
           <div class="tip-box"><b>ถ้าหัวเดือนใน Excel ผิด</b><span>ระบบใช้ “รอบที่เลือกในหน้าเว็บ” เป็นหลัก และจะแจ้งเตือนว่าหัวไฟล์ไม่ตรง แต่ไม่ทำให้วันที่เลื่อนไปผิดเดือน</span></div>
           <div class="tip-box"><b>Bacteria — เวรดึก</b><span>ช่อง “ดึก 00:00–08:00” นับเป็นวันถัดไป เช่น แถววันที่ 15 ส.ค. ช่องดึก = OT วันที่ 16 ส.ค. จึงเข้ารอบ 16 ส.ค.–15 ก.ย.</span></div>
@@ -200,6 +200,6 @@
     };
     window.PSC_OT_CONFIG = window.LAB_OT_CONFIG;
   </script>
-  <script src="app.js?v=20260903-4"></script>
+  <script src="app.js?v=20260903-5"></script>
 </body>
 </html>

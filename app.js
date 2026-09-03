@@ -34,7 +34,8 @@
     snapshotAt: null,
     loadedSnapshot: false,
     conflicts: [],
-    history: []
+    history: [],
+    hrExport: null
   };
 
   const $ = id => document.getElementById(id);
@@ -108,7 +109,7 @@
     const old = state.cycle.start;
     updateCycleTitle();
     if (old && old !== state.cycle.start) {
-      state.calendarSources = []; state.leaveEvents = []; state.calendarSyncedAt = null; state.snapshotAt = null; state.loadedSnapshot = false;
+      state.calendarSources = []; state.leaveEvents = []; state.calendarSyncedAt = null; state.snapshotAt = null; state.loadedSnapshot = false; state.hrExport = null;
       for (const unit of UNITS) {
         const raw = state.rawFiles[unit];
         if (raw) {
@@ -183,6 +184,7 @@
     $('bacteriaFile').addEventListener('change', e => onUnitFile('Bacteria', e.target.files?.[0]));
     $('syncCalendarBtn').addEventListener('click', syncCalendar);
     $('exportBtn').addEventListener('click', exportWorkbook);
+    $('exportBtn').textContent = 'Export HR Excel';
     $('saveBtn').addEventListener('click', saveCycle);
     $('refreshHistoryBtn').addEventListener('click', loadHistory);
     document.querySelectorAll('.tab').forEach(btn => btn.addEventListener('click', () => switchTab(btn.dataset.tab)));
@@ -212,7 +214,7 @@
       state.rawFiles[unit] = { name:file.name, buffer };
       const parsed = parseUnit(unit, buffer, file.name);
       state.units[unit] = parsed;
-      state.calendarSources = []; state.leaveEvents = []; state.calendarSyncedAt = null; state.snapshotAt = null; state.loadedSnapshot = false;
+      state.calendarSources = []; state.leaveEvents = []; state.calendarSyncedAt = null; state.snapshotAt = null; state.loadedSnapshot = false; state.hrExport = null;
       const warnCount = parsed.validation.filter(x => x.type === 'warn').length;
       setUnitStatus(unit, `✓ ${file.name} · ${parsed.assignments.length} รายการ · ${parsed.totalHours} ชม.${warnCount ? ` · มี ${warnCount} จุดให้ตรวจ` : ''}`, warnCount ? 'warn' : 'ok');
       $('calendarSyncMeta').hidden = true;
@@ -461,7 +463,7 @@
       if (!data?.ok) throw new Error(data?.error || 'ดึง Calendar ไม่สำเร็จ');
       state.calendarSources = data.sources || [];
       state.leaveEvents = state.calendarSources.flatMap(src => (src.events||[]).map(ev => ({...ev, source:src.name}))).filter(ev => ev.start && ev.end);
-      state.calendarSyncedAt = data.synced_at || new Date().toISOString(); state.loadedSnapshot=false;
+      state.calendarSyncedAt = data.synced_at || new Date().toISOString(); state.loadedSnapshot=false; state.hrExport=null;
       $('calendarStatus').className='file-status ok'; $('calendarStatus').textContent=`✓ ดึง ${state.calendarSources.length} Calendar · ${state.leaveEvents.length} รายการในรอบ`;
       $('calendarSyncMeta').hidden=false;
       $('calendarSyncMeta').innerHTML=`<b>อัปเดตล่าสุด:</b> ${esc(fmtDateTimeThai(state.calendarSyncedAt))}<br><b>Calendar:</b> ${esc(state.calendarSources.map(x=>x.name).join(' · '))}`;
@@ -471,37 +473,392 @@
     } finally { $('syncCalendarBtn').disabled = state.offline || !unitsReady(); }
   }
 
-  function exportWorkbook() {
-    if (!unitsReady()) return toast('ต้องมีไฟล์ครบ 3 หน่วยก่อน Export');
-    const assignments = allAssignments().sort((a,b)=>a.date.localeCompare(b.date)||a.name.localeCompare(b.name,'th')||a.unit.localeCompare(b.unit));
-    const summary = buildSummary(assignments), unitSummary=buildUnitSummary(assignments);
-    const wb = XLSX.utils.book_new();
-    const aoaSummary = [['ชื่อ','LAB (ชม.)','Molec (ชม.)','Bacteria (ชม.)','รวม (ชม.)','ช่วง 8 ชม.','จำนวนรายการเวร'], ...summary.map(r=>[r.name,r.LAB,r.Molec,r.Bacteria,r.hours,round1(r.hours/8),r.count])];
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(aoaSummary), 'Summary_รวม');
-    const aoaUnit = [['หน่วย','จำนวนคน','รายการเวร','OT รวม (ชม.)','ช่วง 8 ชม.'], ...unitSummary.map(r=>[r.unit,r.staff,r.count,r.hours,round1(r.hours/8)])];
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(aoaUnit), 'Summary_หน่วย');
-    const conflictKeys = new Set(state.conflicts.map(x=>[x.unit,x.date,x.duty,normName(x.name)].join('|')));
-    const detail = [['วันที่ OT','ชื่อ','หน่วย','เวร','เวลา','ชั่วโมง','วันที่แถวต้นทาง','วันหยุด *','เตือน Calendar']];
-    assignments.forEach(a => detail.push([
-      a.date, a.name, a.unit, a.duty, a.timeLabel, a.hours, a.sourceDate, a.holiday ? 'ใช่' : '',
-      conflictKeys.has([a.unit,a.date,a.duty,normName(a.name)].join('|')) ? 'ตรวจ' : ''
-    ]));
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(detail), 'Detail_OT');
-    const warnings = [['วันที่ OT','ชื่อ','หน่วย','เวร','เวลา OT','ชั่วโมง','Calendar','ช่วงวัน Calendar','รายการใน Calendar']];
-    state.conflicts.forEach(x => warnings.push([
-      x.date, x.name, x.unit, x.duty, x.timeLabel, x.hours, x.calendar, `${x.leaveStart} - ${x.leaveEnd}`, x.summary
-    ]));
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(warnings), 'Leave_Warnings');
-    const cal = [['Calendar','เริ่ม','สิ้นสุด','รายการ'], ...state.leaveEvents.map(x=>[x.source,x.start,x.end,x.summary])];
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(cal), 'Calendar_Leave');
-    const checks = [['ประเภท','ข้อความ']];
-    for(const unit of UNITS) for(const v of state.units[unit].validation) checks.push([v.type,v.text]);
-    checks.push(['info',`Calendar sync: ${state.calendarSyncedAt || 'ยังไม่ได้ Sync'}`]);
-    checks.push(['info',`Snapshot: ${state.snapshotAt || 'ยังไม่ได้บันทึก'}`]);
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(checks), 'Checks');
-    const d1=parseIso(state.cycle.start), d2=parseIso(state.cycle.end);
-    const fileName=`LAB_OT_${d1.getFullYear()+543}_${pad(d1.getMonth()+1)}16-${pad(d2.getMonth()+1)}15.xlsx`;
-    XLSX.writeFile(wb, fileName);
+
+  /* ===========================
+     HR EXPORT — LAB/Molec/Bacteria
+     All personnel use MT rate only.
+     Normal base = 130 THB/h, special public holiday = 160 THB/h.
+     HR dummy claim codes follow CNMI MT format:
+       normal 00000074, holiday/weekend 00000075.
+     =========================== */
+  const HR_MT = Object.freeze({
+    baseRate:130, holidayRate:160,
+    normalCode:'00000074', holidayCode:'00000075',
+    premiumCode:'00000076', specialCode:'00000328'
+  });
+
+  const HR_STAFF_MASTER = Object.freeze({
+    'อัฐฒพงษ์':{fullName:'นาย อัฐฒพงษ์ สารารัตน์',employeeCode:'0017593'},
+    'วุฒิศักดิ์':{fullName:'นาย วุฒิศักดิ์ ตรีสารวัฒน์',employeeCode:'0017594'},
+    'พนิดา':{fullName:'น.ส. พนิดา พรสุโรจน์',employeeCode:'0017596'},
+    'สุพิชญา':{fullName:'น.ส. สุพิชญา สินน้อย',employeeCode:'0017642'},
+    'พุธธิดา':{fullName:'น.ส. พุธธิดา เปล่งเกียรติกุล',employeeCode:'0017669'},
+    'จินตนาพร':{fullName:'น.ส. จินตนาพร สุขสวัสดิ์',employeeCode:'0017672'},
+    'ชนกกานต์':{fullName:'น.ส. ชนกกานต์ ทิพย์รัตน์',employeeCode:'0017830'},
+    'ศกุนตลา':{fullName:'น.ส. ศกุนตลา โกสะรุทธะ',employeeCode:'0017831'},
+    'ศิวาพร':{fullName:'น.ส. ศิวาพร นามแดง',employeeCode:'0019348'},
+    'ปฐวี':{fullName:'นาย ปฐวี ลี้ประเสริฐ',employeeCode:'0019349'},
+    'ธันยธร':{fullName:'น.ส. ธันยธร อุดมเดชสวัสดิ์',employeeCode:'0019354'},
+    'อาริสา':{fullName:'น.ส. อาริสา กลัดเพชร',employeeCode:'0019525'},
+    'พรพรรณ':{fullName:'น.ส. พรพรรณ บุญเกิด',employeeCode:'0019600'},
+    'ปาริฉัตร':{fullName:'น.ส. ปาริฉัตร อินทร์เกลี้ยง',employeeCode:'0020305'},
+    'สิริฉัตร':{fullName:'น.ส. สิริฉัตร สุขอู๊ด',employeeCode:'0020312'},
+    'ชูศักดิ์':{fullName:'นาย ชูศักดิ์ ธงสัตย์',employeeCode:'0020315'},
+    'สิริภัท':{fullName:'น.ส. สิริภัท กลั่นทิพย์',employeeCode:'0020496'},
+    'ประภาพร':{fullName:'น.ส. ประภาพร ศรีหมอก',employeeCode:'0020736'},
+    'ชลมณี':{fullName:'น.ส. ชลมณี สุขช่วย',employeeCode:'0020738'},
+    'ศิรสิทธิ์พล':{fullName:'นาย ศิรสิทธิ์พล บทจร',employeeCode:'0012138'},
+    'ปิยดา':{fullName:'น.ส. ปิยดา แมกไม้รักษา',employeeCode:'0020533'},
+    'ศศิวิมล':{fullName:'น.ส. ศศิวิมล แสนเสนา',employeeCode:'0020737'},
+    'วัชระชัย':{fullName:'นาย วัชรชัย มูลประเสริฐ',employeeCode:'0020739'},
+    'พัชรวรรณ':{fullName:'พัชรวรรณ รัตนพิบูลย์',employeeCode:'0021537'},
+    'อภิชฎา':{fullName:'อภิชฎา อุ่นเมือง',employeeCode:'0021414'},
+    'ชินกร':{fullName:'ชินกร วัชระวรรณชัย',employeeCode:'0021415'},
+    'พิมพ์มาดา':{fullName:'พิมพ์มาดา อนันตกูล',employeeCode:'0021671'},
+    'ฐิติยา':{fullName:'ฐิติยา ตู้เจริญ',employeeCode:'0021672'},
+    'นารีรัตน์':{fullName:'นารีรัตน์ หมีทอง',employeeCode:'0023167'},
+    'ญาธิป':{fullName:'ญาธิป พุ่มคง',employeeCode:'0023216'},
+    'ปาลีรัตน์':{fullName:'ปาลีรัตน์ รังรักษ์รัตนากร',employeeCode:'0026192'},
+    'วารีวัลย์':{fullName:'วารีวัลย์ หุ่นเทอดไทย',employeeCode:'0017654'},
+    'ศรัณย์':{fullName:'นาย ศรัณย์ สุรวัฒน์เดชา',employeeCode:'0026230'},
+    'อติชาติ':{fullName:'นาย อติชาติ ยิ้มโสด',employeeCode:'0026231'},
+    'ณรงค์ชัย':{fullName:'นาย ณรงค์ชัย คำมูลตรี',employeeCode:'0027961'},
+    'จิณห์นิภา':{fullName:'น.ส. จิณห์นิภา ไตรอนันต์วุฒิกุล',employeeCode:'0027960'}
+  });
+
+  const hrRound2 = v => Math.round((Number(v)||0)*100)/100;
+  function hrStaff(name) {
+    const key = normName(name);
+    const info = HR_STAFF_MASTER[key];
+    if (!info) return null;
+    return { nick:key, fullName:info.fullName, employeeCode:String(info.employeeCode).replace(/\D/g,'').padStart(7,'0') };
+  }
+  function hrDateList(start,end) {
+    const out=[]; let d=start, guard=0;
+    while(d && d<=end && guard++<100){ out.push(d); d=addDays(d,1); }
+    return out;
+  }
+  function hrWeekend(date) { const day=parseIso(date).getDay(); return day===0 || day===6; }
+  function hrHolidayDates(assignments) {
+    return new Set((assignments||[]).filter(x=>x.holiday).map(x=>x.date));
+  }
+  function hrIsDummyHoliday(date,holidaySet) { return hrWeekend(date) || holidaySet.has(date); }
+  function hrActualRate(date,holidaySet) { return holidaySet.has(date) ? HR_MT.holidayRate : HR_MT.baseRate; }
+  function hrSlotTimes(slot) {
+    if(slot===8) return {start:'08:00',end:'16:00',startValue:8/24,endValue:16/24};
+    if(slot===16) return {start:'16:00',end:'00:00',startValue:16/24,endValue:0};
+    return {start:'00:00',end:'08:00',startValue:0,endValue:8/24};
+  }
+  function hrAllowedSlots(date,holidaySet) { return hrIsDummyHoliday(date,holidaySet) ? [0,8,16] : [0,16]; }
+  function hrIsLeaveEvent(ev) {
+    const s=String(ev?.summary||'').toLowerCase();
+    return /ลา|พักผ่อน|พักร้อน|ป่วย|ลากิจ|หาหมอ|พบแพทย์|แพทย์นัด|นัดตรวจ|ตรวจสุขภาพ/.test(s);
+  }
+  function hrLeaveDateSetForName(name) {
+    const out=new Set(), needle=normSearch(name);
+    if(!needle) return out;
+    for(const ev of (state.leaveEvents||[])) {
+      if(!hrIsLeaveEvent(ev)) continue;
+      if(!normSearch(ev.summary).includes(needle)) continue;
+      let d=ev.start, guard=0;
+      while(d && ev.end && d<=ev.end && guard++<70) {
+        if(between(d,state.cycle.start,state.cycle.end)) out.add(d);
+        d=addDays(d,1);
+      }
+    }
+    return out;
+  }
+  function hrPreviousCycle() {
+    const d=parseIso(state.cycle.start);
+    d.setMonth(d.getMonth()-1);
+    return cycleFromStartMonth(d.getFullYear(),d.getMonth()+1);
+  }
+  async function hrCarryInInfo() {
+    const prev=hrPreviousCycle(), empty={map:{},sourceMonth:prev.start.slice(0,7),sourceCycleKey:`${prev.start}_${prev.end}`,found:false};
+    if(state.offline || !state.sb) return empty;
+    const {data,error}=await state.sb.from('ot_batches').select('payload').eq('cycle_key',empty.sourceCycleKey).limit(1);
+    if(error) throw error;
+    const saved=data?.[0]?.payload?.hrExport?.carryOutByEmployeeCode;
+    if(!saved || typeof saved!=='object') return empty;
+    return {...empty,map:saved,found:true};
+  }
+  function hrBuildTotals(assignments,carryInfo,holidaySet) {
+    const map=new Map();
+    for(const a of assignments) {
+      const s=hrStaff(a.name);
+      if(!s) continue;
+      const rate=hrActualRate(a.date,holidaySet);
+      const actual=hrRound2(a.hours), hrHours=hrRound2(actual*rate/HR_MT.baseRate), money=hrRound2(actual*rate);
+      if(!map.has(s.employeeCode)) map.set(s.employeeCode,{
+        ...s,baseType:'MT',baseRate:HR_MT.baseRate,actual:0,currentTotal:0,actualMoney:0,
+        carryIn:hrRound2(carryInfo?.map?.[s.employeeCode]||0),carrySourceMonth:carryInfo?.sourceMonth||'',
+        rows:[],total:0,claimed:0,carry:0,claimedUnits:0,unallocatedUnits:0,normalHours:0,holidayHours:0,money:0
+      });
+      const t=map.get(s.employeeCode);
+      t.actual=hrRound2(t.actual+actual);
+      t.currentTotal=hrRound2(t.currentTotal+hrHours);
+      t.actualMoney=hrRound2(t.actualMoney+money);
+      t.rows.push({assignment:a,actual,hrHours,rate,money});
+    }
+    const totals=[...map.values()].sort((a,b)=>a.fullName.localeCompare(b.fullName,'th'));
+    totals.forEach(t=>{t.total=hrRound2(t.currentTotal+t.carryIn);});
+    return totals;
+  }
+  function hrAllocate(totals,holidaySet) {
+    const dates=hrDateList(state.cycle.start,state.cycle.end), dateCount=Math.max(1,dates.length);
+    const leaveMap=new Map(totals.map(t=>[t.employeeCode,hrLeaveDateSetForName(t.nick)]));
+    const totalUnits=totals.reduce((s,t)=>s+Math.max(0,Math.floor((Number(t.total||0)+1e-7)/8)),0);
+    const dateInfos=dates.map((date,index)=>({date,index,slots:hrAllowedSlots(date,holidaySet),target:0,slotTargets:new Map()}));
+    const totalWeight=Math.max(1,dateInfos.reduce((s,x)=>s+x.slots.length,0));
+    let base=0;
+    dateInfos.forEach(info=>{const ideal=totalUnits*info.slots.length/totalWeight;info.ideal=ideal;info.frac=ideal-Math.floor(ideal);info.target=Math.floor(ideal);base+=info.target;});
+    let extra=Math.max(0,totalUnits-base);
+    dateInfos.slice().sort((a,b)=>b.frac-a.frac||a.index-b.index).slice(0,extra).forEach(x=>x.target++);
+    dateInfos.forEach(info=>{
+      const n=info.slots.length,b=Math.floor(info.target/n),rem=info.target%n,start=info.index%n;
+      info.slots.forEach(s=>info.slotTargets.set(s,b));
+      for(let i=0;i<rem;i++){const s=info.slots[(start+i)%n];info.slotTargets.set(s,(info.slotTargets.get(s)||0)+1);}
+    });
+    const infoMap=new Map(dateInfos.map(x=>[x.date,x])), cells=[];
+    dateInfos.forEach(info=>info.slots.forEach(slot=>cells.push({date:info.date,index:info.index,slot,target:info.slotTargets.get(slot)||0,assigned:0})));
+    const rows=[], byStaffDay=new Map(), dateOcc=new Map(), staffDates=new Map();
+    const daySlots=(code,date)=>{const k=`${code}|${date}`;if(!byStaffDay.has(k))byStaffDay.set(k,new Set());return byStaffDay.get(k);};
+    const datesForStaff=code=>{if(!staffDates.has(code))staffDates.set(code,new Set());return staffDates.get(code);};
+    const canUse=(t,cell,overflow=false)=>{
+      if(!overflow && cell.assigned>=cell.target) return false;
+      if(overflow && cell.assigned>=6) return false;
+      if(leaveMap.get(t.employeeCode)?.has(cell.date)) return false;
+      const used=daySlots(t.employeeCode,cell.date);
+      if(used.has(cell.slot) || used.size>=2) return false;
+      if(used.size===1) {
+        const only=[...used][0];
+        if(only===8 || cell.slot===8 || Math.abs(only-cell.slot)!==16) return false;
+      }
+      return true;
+    };
+    const add=(t,cell)=>{
+      const times=hrSlotTimes(cell.slot), holiday=hrIsDummyHoliday(cell.date,holidaySet);
+      rows.push({
+        employeeCode:t.employeeCode,nick:t.nick,fullName:t.fullName,date:cell.date,slot:cell.slot,
+        ...times,type:holiday?2:1,claimCode:holiday?HR_MT.holidayCode:HR_MT.normalCode
+      });
+      cell.assigned++;dateOcc.set(cell.date,(dateOcc.get(cell.date)||0)+1);
+      daySlots(t.employeeCode,cell.date).add(cell.slot);datesForStaff(t.employeeCode).add(cell.date);
+    };
+    const remaining=new Map(), desired=new Map(), assigned=new Map();
+    totals.forEach(t=>{const n=Math.max(0,Math.floor((Number(t.total||0)+1e-7)/8));remaining.set(t.employeeCode,n);desired.set(t.employeeCode,n);assigned.set(t.employeeCode,0);});
+    const remainingTotal=()=>[...remaining.values()].reduce((s,n)=>s+n,0);
+    let round=0,progress=true;
+    while(remainingTotal()>0 && progress && round++<120) {
+      progress=false;
+      const order=totals.slice().sort((a,b)=>(remaining.get(b.employeeCode)||0)-(remaining.get(a.employeeCode)||0)||a.nick.localeCompare(b.nick,'th'));
+      order.forEach((t,staffIndex)=>{
+        const left=remaining.get(t.employeeCode)||0;if(left<=0)return;
+        const prevDates=datesForStaff(t.employeeCode), candidates=[];
+        for(const cell of cells) {
+          if(!canUse(t,cell,false)) continue;
+          const info=infoMap.get(cell.date), occ=dateOcc.get(cell.date)||0;
+          const adjacent=(prevDates.has(addDays(cell.date,-1))?1:0)+(prevDates.has(addDays(cell.date,1))?1:0);
+          const used=daySlots(t.employeeCode,cell.date).size;
+          const rotation=(cell.index-((staffIndex*3+round)%dateCount)+dateCount)%dateCount;
+          candidates.push({cell,score:[adjacent,used,cell.assigned/Math.max(1,cell.target),occ/Math.max(1,info.target),rotation,cell.slot]});
+        }
+        if(!candidates.length)return;
+        candidates.sort((a,b)=>{for(let i=0;i<a.score.length;i++){if(a.score[i]!==b.score[i])return a.score[i]-b.score[i];}return 0;});
+        add(t,candidates[0].cell);remaining.set(t.employeeCode,left-1);assigned.set(t.employeeCode,(assigned.get(t.employeeCode)||0)+1);progress=true;
+      });
+    }
+    let fallback=0;
+    while(remainingTotal()>0 && fallback++<120) {
+      let moved=false;
+      for(const t of totals) {
+        const left=remaining.get(t.employeeCode)||0;if(left<=0)continue;
+        const candidates=[];
+        for(const cell of cells) {
+          if(!canUse(t,cell,true))continue;
+          const adjacent=(datesForStaff(t.employeeCode).has(addDays(cell.date,-1))?1:0)+(datesForStaff(t.employeeCode).has(addDays(cell.date,1))?1:0);
+          candidates.push({cell,score:[adjacent,cell.assigned,dateOcc.get(cell.date)||0,cell.index,cell.slot]});
+        }
+        if(!candidates.length)continue;
+        candidates.sort((a,b)=>{for(let i=0;i<a.score.length;i++){if(a.score[i]!==b.score[i])return a.score[i]-b.score[i];}return 0;});
+        add(t,candidates[0].cell);remaining.set(t.employeeCode,left-1);assigned.set(t.employeeCode,(assigned.get(t.employeeCode)||0)+1);moved=true;
+      }
+      if(!moved)break;
+    }
+    totals.forEach(t=>{
+      const claimedUnits=assigned.get(t.employeeCode)||0;
+      t.claimedUnits=claimedUnits;t.claimed=hrRound2(claimedUnits*8);t.carry=hrRound2(t.total-t.claimed);
+      t.unallocatedUnits=Math.max(0,(desired.get(t.employeeCode)||0)-claimedUnits);
+      const mine=rows.filter(x=>x.employeeCode===t.employeeCode);
+      t.normalHours=mine.filter(x=>x.type===1).length*8;t.holidayHours=mine.filter(x=>x.type===2).length*8;
+      t.money=hrRound2(t.claimed*HR_MT.baseRate);
+    });
+    rows.sort((a,b)=>a.date.localeCompare(b.date)||a.slot-b.slot||a.nick.localeCompare(b.nick,'th'));
+    const leaveSkipped=[];
+    totals.forEach(t=>[...(leaveMap.get(t.employeeCode)||[])].sort().forEach(date=>leaveSkipped.push({employeeCode:t.employeeCode,fullName:t.fullName,date})));
+    return {rows,leaveSkipped};
+  }
+  function hrSourceRows(totals,holidaySet) {
+    const out=[];
+    totals.forEach(t=>t.rows.forEach(x=>{
+      const a=x.assignment;
+      out.push({
+        'รหัสพนักงาน':t.employeeCode,'ชื่อ':t.fullName,'ชื่อเล่น':t.nick,'วันที่ OT จริง':a.date,
+        'เดือนเบิกจริง':state.cycle.start.slice(0,7),'รอบ HR dummy':`${state.cycle.start} ถึง ${state.cycle.end}`,
+        'เหตุผล':`เวร ${a.unit} ${a.duty}`,'หมายเหตุ':`${a.timeLabel}${a.holiday?' | วันหยุด *':''}`,
+        'ประเภทเวร':`${a.unit}-${a.duty}`,'ชั่วโมงจริง':x.actual,'เรทงานจริง (บาท/ชม.)':x.rate,
+        'ฐาน HR (บาท/ชม.)':HR_MT.baseRate,'ชั่วโมงเทียบ HR':x.hrHours,'เงินตามงานจริง':x.money,
+        'การแปลงเรท':x.rate===HR_MT.holidayRate?'MT วันหยุด 160 → ฐาน HR 130':'MT 130 → ฐาน HR 130',
+        'claim_status ก่อน Export':'ready'
+      });
+    }));
+    return out.sort((a,b)=>String(a['วันที่ OT จริง']).localeCompare(String(b['วันที่ OT จริง']))||String(a['ชื่อเล่น']).localeCompare(String(b['ชื่อเล่น']),'th'));
+  }
+  function hrStaffSummaryRows(totals) {
+    return totals.map(t=>({
+      'รหัสพนักงาน':t.employeeCode,'ชื่อ':t.fullName,'ชื่อเล่น':t.nick,'กลุ่ม HR':'MT','ฐาน HR':HR_MT.baseRate,
+      'ชั่วโมงจริงรวม':t.actual,'OT เดือนนี้เทียบ HR':t.currentTotal,'ยอดทบยกมา(ชม.)':t.carryIn,
+      'เดือนยอดทบยกมา':t.carrySourceMonth||'','โอทีทั้งหมดรวมยอดทบ':t.total,'เบิกจริง':t.claimed,
+      'ทบเดือนหน้า(ชม.)':t.carry,'จำนวนเวร 8 ชม.':t.claimedUnits,'เวรที่จัดไม่ได้เพราะลา/ความจุ':t.unallocatedUnits,
+      'คำนวณเป็นเงิน':t.money
+    }));
+  }
+  function hrHolidayList(holidaySet) {
+    return hrDateList(state.cycle.start,state.cycle.end).filter(d=>hrIsDummyHoliday(d,holidaySet)).map(d=>String(Number(d.slice(-2))).padStart(2,'0')).join(',');
+  }
+  function hrOtExtraSheet(sourceRows,totals,carryInfo) {
+    const rows=[
+      [`สรุป OT รอบ ${state.cycle.start} ถึง ${state.cycle.end} / HR dummy ${state.cycle.start} ถึง ${state.cycle.end}`],
+      ['ชื่อ','OT เดือนนี้เทียบ HR','ยอดทบยกมา','เดือนยอดทบ','โอทีทั้งหมดรวมยอดทบ','เบิกจริง','ทบเดือนหน้า','ฐาน HR','คำนวณเป็นเงิน','หมายเหตุ'],
+      ...totals.map(t=>[t.fullName,t.currentTotal,t.carryIn,t.carrySourceMonth||'',t.total,t.claimed,t.carry,HR_MT.baseRate,t.money,
+        [t.carryIn>0?'รวมยอดทบจากรอบก่อนอัตโนมัติ':'',!carryInfo.found?'ไม่พบ Snapshot Export รอบก่อน — ใช้ยอดยกมา 0':'','ทุกคนใช้กลุ่ม MT'].filter(Boolean).join(' • ')]),
+      [],
+      ['รายละเอียดต้นทางรอบปัจจุบัน'],
+      ['ชื่อ','วันที่ OT','เหตุผล','ประเภทเวร','ชั่วโมงจริง','เรทงานจริง','ฐาน HR','ชั่วโมงเทียบ HR','เงินตามงานจริง','หมายเหตุการแปลง'],
+      ...sourceRows.map(r=>[r['ชื่อ'],r['วันที่ OT จริง'],r['เหตุผล'],r['ประเภทเวร'],r['ชั่วโมงจริง'],r['เรทงานจริง (บาท/ชม.)'],r['ฐาน HR (บาท/ชม.)'],r['ชั่วโมงเทียบ HR'],r['เงินตามงานจริง'],r['การแปลงเรท']])
+    ];
+    const ws=XLSX.utils.aoa_to_sheet(rows);ws['!cols']=[{wch:34},{wch:18},{wch:15},{wch:15},{wch:22},{wch:15},{wch:18},{wch:12},{wch:16},{wch:60}];return ws;
+  }
+  function hrScheduleSheet(allocation,totals) {
+    const start=parseIso(state.cycle.start),first=new Date(start);first.setDate(first.getDate()-first.getDay());
+    const end=parseIso(state.cycle.end),last=new Date(end);last.setDate(last.getDate()+(6-last.getDay()));
+    const weeks=Math.ceil((last-first)/(7*86400000))+1,cols=31,data=[];
+    const row1=Array(cols).fill(null),row2=Array(cols).fill(null);
+    for(let day=0;day<7;day++){const c=1+day*3;row1[c]=['อาทิตย์','จันทร์','อังคาร','พุธ','พฤหัส','ศุกร์','เสาร์'][day];row2[c]=0;row2[c+1]=8;row2[c+2]=16;}
+    ['ชื่อ','จำนวน','วันหยุดพิเศษ','คิดเงิน (บาท)','คิดเงิน (บาท) + วันที่ 13-15','โอทีทั้งหมด','เบิกจริง','ทบเดือนหน้า(ชม.)'].forEach((h,i)=>row1[23+i]=h);
+    data.push(row1,row2);
+    const byCell=new Map();allocation.rows.forEach(x=>{const k=`${x.date}|${x.slot}`;if(!byCell.has(k))byCell.set(k,[]);byCell.get(k).push(x.nick);});
+    for(let w=0;w<weeks;w++){
+      const dateRow=Array(cols).fill(null);dateRow[0]='วันที่';
+      const nameRows=Array.from({length:6},(_,i)=>{const r=Array(cols).fill(null);r[0]=String.fromCharCode(65+i);return r;});
+      for(let day=0;day<7;day++){
+        const d=new Date(first);d.setDate(first.getDate()+w*7+day);const key=isoDate(d),c=1+day*3;
+        if(key>=state.cycle.start&&key<=state.cycle.end){
+          dateRow[c]=String(Number(key.slice(-2))).padStart(2,'0');
+          for(const slot of [0,8,16]){const names=byCell.get(`${key}|${slot}`)||[],col=c+(slot===0?0:slot===8?1:2);for(let i=0;i<Math.min(6,names.length);i++)nameRows[i][col]=names[i];}
+        }
+      }
+      data.push(dateRow,...nameRows);
+    }
+    while(data.length<totals.length+2)data.push(Array(cols).fill(null));
+    totals.forEach((t,i)=>{const r=data[i+2]||(data[i+2]=Array(cols).fill(null));r[23]=t.nick;r[24]=t.claimedUnits;r[25]=t.holidayHours/8;r[26]=t.money;r[27]=t.money;r[28]=t.total;r[29]=t.claimed;r[30]=t.carry;});
+    const ws=XLSX.utils.aoa_to_sheet(data);ws['!cols']=[{wch:7},...Array.from({length:21},()=>({wch:13})),{wch:2},{wch:20},{wch:10},{wch:14},{wch:16},{wch:22},{wch:14},{wch:12},{wch:18}];return ws;
+  }
+  function hrCopySheet(allocation,holidaySet) {
+    const rows=[['name','time','วันที่','1 = ธรรมดา\n2 = วันหยุด\n3 = พรีเมียม\n4 = อื่นๆ1\n5 = อื่นๆ2','copy ใส่ macro HR >>>','key no','no','วันที่','เวลาเข้า','เวลาออก','วันที่เต็ม (ตรวจสอบ)','วันหยุด>',hrHolidayList(holidaySet)]];
+    allocation.rows.forEach(x=>rows.push([x.nick,x.slot,Number(x.date.slice(-2)),x.type,'',x.claimCode,x.employeeCode,Number(x.date.slice(-2)),x.startValue,x.endValue,x.date,'','']));
+    const ws=XLSX.utils.aoa_to_sheet(rows);ws['!cols']=[{wch:22},{wch:8},{wch:8},{wch:18},{wch:24},{wch:12},{wch:12},{wch:8},{wch:12},{wch:12},{wch:14},{wch:12},{wch:45}];
+    for(let r=2;r<=rows.length;r++){for(const col of ['F','G'])if(ws[`${col}${r}`]){ws[`${col}${r}`].t='s';ws[`${col}${r}`].z='@';}for(const col of ['I','J'])if(ws[`${col}${r}`]){ws[`${col}${r}`].t='n';ws[`${col}${r}`].z='h:mm';}}
+    ws['!autofilter']={ref:`A1:M${Math.max(1,rows.length)}`};return ws;
+  }
+  function hrTimeSheet() {
+    const ws=XLSX.utils.aoa_to_sheet([[null,'เข้า','ออก'],[0,0,8/24],[8,8/24,16/24],[16,16/24,0]]);
+    for(let r=2;r<=4;r++)for(const col of ['B','C']){ws[`${col}${r}`].t='n';ws[`${col}${r}`].z='h:mm';}
+    ws['!cols']=[{wch:8},{wch:12},{wch:12}];return ws;
+  }
+  function hrNameSheet(totals) {
+    const rows=[['ชื่อ','รหัสพนักงาน','รหัสเบิกธรรมดา','รหัสเบิกวันหยุด','รหัสเบิกพรีเมียม','วันหยุดพิเศษ','อื่นๆ2','รวม(บาท)','ชั่วโมงธรรมดา','ชั่วโมงวันหยุด','จำนวนธรรมดา','จำนวนวันหยุด','เรทงานจริงวันปกติ','เรทงานจริงนักขัต','หมายเหตุ']];
+    totals.forEach(t=>rows.push([t.nick,t.employeeCode,HR_MT.normalCode,HR_MT.holidayCode,HR_MT.premiumCode,HR_MT.specialCode,'',t.money,HR_MT.baseRate,HR_MT.baseRate,t.normalHours,t.holidayHours,HR_MT.baseRate,HR_MT.holidayRate,'ทุกคนเป็น MT']));
+    const ws=XLSX.utils.aoa_to_sheet(rows);ws['!cols']=[{wch:22},{wch:14},{wch:17},{wch:17},{wch:17},{wch:15},{wch:12},{wch:14},{wch:15},{wch:15},{wch:15},{wch:15},{wch:18},{wch:18},{wch:32}];
+    for(let r=2;r<=rows.length;r++)for(const col of ['B','C','D','E','F'])if(ws[`${col}${r}`]){ws[`${col}${r}`].t='s';ws[`${col}${r}`].z='@';}
+    return ws;
+  }
+  function hrHrSheet(allocation) {
+    const rows=[['key no','no','วันที่','เวลาเข้า','เวลาออก'],...allocation.rows.map(x=>[x.claimCode,x.employeeCode,Number(x.date.slice(-2)),x.startValue,x.endValue])];
+    const ws=XLSX.utils.aoa_to_sheet(rows);ws['!cols']=[{wch:14},{wch:14},{wch:10},{wch:12},{wch:12}];
+    for(let r=2;r<=rows.length;r++){for(const col of ['A','B'])if(ws[`${col}${r}`]){ws[`${col}${r}`].t='s';ws[`${col}${r}`].z='@';}for(const col of ['D','E'])if(ws[`${col}${r}`]){ws[`${col}${r}`].t='n';ws[`${col}${r}`].z='h:mm';}}
+    return ws;
+  }
+  function hrJsonSheet(rows,headers,widths) {
+    const ws=XLSX.utils.json_to_sheet(rows,{header:headers});ws['!cols']=(widths||headers.map(()=>16)).map(w=>({wch:w}));
+    ws['!autofilter']={ref:`A1:${XLSX.utils.encode_col(headers.length-1)}${Math.max(1,rows.length+1)}`};return ws;
+  }
+  async function hrPersistExport(totals,allocation,carryInfo) {
+    const now=new Date().toISOString(), carryOutByEmployeeCode=Object.fromEntries(totals.map(t=>[t.employeeCode,t.carry]));
+    state.hrExport={
+      version:'HR-MT-1.0',exportedAt:now,baseType:'MT',baseRate:HR_MT.baseRate,holidayRate:HR_MT.holidayRate,
+      carrySourceCycleKey:carryInfo.sourceCycleKey,carrySourceFound:carryInfo.found,carryOutByEmployeeCode,
+      totalDummyRows:allocation.rows.length,totalClaimedHours:hrRound2(allocation.rows.length*8)
+    };
+    if(state.offline || !state.sb) return;
+    const cycleKey=`${state.cycle.start}_${state.cycle.end}`;
+    const payload={
+      version:'2.1-all-units-hr-export',cycle:{...state.cycle},
+      units:Object.fromEntries(UNITS.map(u=>[u,state.units[u]])),
+      calendarSources:state.calendarSources,leaveEvents:state.leaveEvents,
+      calendarSyncedAt:state.calendarSyncedAt,conflicts:state.conflicts,savedAt:state.snapshotAt||now,hrExport:state.hrExport
+    };
+    const {error}=await state.sb.from('ot_batches').upsert({
+      cycle_key:cycleKey,cycle_start:state.cycle.start,cycle_end:state.cycle.end,
+      unit_file_names:Object.fromEntries(UNITS.map(u=>[u,state.units[u].fileName])),
+      calendar_synced_at:state.calendarSyncedAt,snapshot_at:state.snapshotAt||now,payload,updated_at:now
+    },{onConflict:'cycle_key'});
+    if(error) throw error;
+    if(!state.snapshotAt) state.snapshotAt=now;
+  }
+
+  async function exportWorkbook() {
+    if (!unitsReady()) return toast('ต้องมีไฟล์ครบ 3 หน่วยก่อน Export HR');
+    if (!state.offline && !state.calendarSyncedAt) return toast('กรุณากด “ดึงวันลาล่าสุด” ก่อน Export HR เพื่อให้ระบบหลบวันลา');
+    const assignments=allAssignments().sort((a,b)=>a.date.localeCompare(b.date)||a.name.localeCompare(b.name,'th')||a.unit.localeCompare(b.unit));
+    const missing=[...new Set(assignments.map(a=>normName(a.name)).filter(n=>!hrStaff(n)))];
+    if(missing.length) return toast(`ยังไม่มีรหัสพนักงานของ: ${missing.join(', ')} กรุณาแจ้ง Admin เพิ่มรายชื่อก่อน Export`);
+    $('exportBtn').disabled=true;
+    const oldLabel=$('exportBtn').textContent;$('exportBtn').textContent='กำลังสร้าง HR…';
+    try {
+      const holidaySet=hrHolidayDates(assignments),carryInfo=await hrCarryInInfo(),totals=hrBuildTotals(assignments,carryInfo,holidaySet);
+      const allocation=hrAllocate(totals,holidaySet);
+      if(!allocation.rows.length) throw new Error('ไม่พบชั่วโมงที่สามารถสร้าง HR dummy ได้');
+      const sourceRows=hrSourceRows(totals,holidaySet),summaryRows=hrStaffSummaryRows(totals);
+      const carryRows=totals.map(t=>({
+        'รหัสพนักงาน':t.employeeCode,'ชื่อ':t.fullName,'เดือน OT ปัจจุบัน':state.cycle.start.slice(0,7),
+        'เดือนยอดทบยกมา':t.carrySourceMonth||'','ยอดทบยกมา(ชม.)':t.carryIn,'OT เดือนนี้เทียบ HR':t.currentTotal,
+        'โอทีทั้งหมดรวมยอดทบ':t.total,'เบิกจริง':t.claimed,'ทบเดือนหน้า(ชม.)':t.carry,
+        'หมายเหตุ':carryInfo.found?'ยอดทบเดือนหน้าบันทึกใน Snapshot รอบนี้อัตโนมัติ':'ไม่พบ Snapshot Export รอบก่อน — รอบนี้เริ่มยอดยกมา 0'
+      }));
+      const leaveRows=allocation.leaveSkipped.map(x=>({'รหัสพนักงาน':x.employeeCode,'ชื่อ':x.fullName,'วันที่ลาในรอบ HR':x.date,'หมายเหตุ':'ระบบไม่สร้าง dummy shift ในวันนี้'}));
+      const wb=XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb,hrOtExtraSheet(sourceRows,totals,carryInfo),'OT เสริม');
+      XLSX.utils.book_append_sheet(wb,hrScheduleSheet(allocation,totals),'ตาราง');
+      XLSX.utils.book_append_sheet(wb,hrCopySheet(allocation,holidaySet),'copy');
+      XLSX.utils.book_append_sheet(wb,hrTimeSheet(),'time');
+      XLSX.utils.book_append_sheet(wb,hrNameSheet(totals),'name');
+      XLSX.utils.book_append_sheet(wb,hrHrSheet(allocation),'HR_OT');
+      XLSX.utils.book_append_sheet(wb,hrJsonSheet(sourceRows,Object.keys(sourceRows[0]||{}),[14,30,14,14,12,24,34,42,14,12,16,12,16,16,44,20]),'Source_OT_1_to_End');
+      XLSX.utils.book_append_sheet(wb,hrJsonSheet(summaryRows,Object.keys(summaryRows[0]||{}),[14,30,14,12,10,16,16,16,22,14,18,14,18,16]),'Staff_Total');
+      XLSX.utils.book_append_sheet(wb,hrJsonSheet(carryRows,Object.keys(carryRows[0]||{'รหัสพนักงาน':'','ชื่อ':'','เดือน OT ปัจจุบัน':'','เดือนยอดทบยกมา':'','ยอดทบยกมา(ชม.)':'','OT เดือนนี้เทียบ HR':'','โอทีทั้งหมดรวมยอดทบ':'','เบิกจริง':'','ทบเดือนหน้า(ชม.)':'','หมายเหตุ':''}),[14,30,16,16,18,18,22,14,18,62]),'Carry_Forward');
+      XLSX.utils.book_append_sheet(wb,hrJsonSheet(leaveRows,Object.keys(leaveRows[0]||{'รหัสพนักงาน':'','ชื่อ':'','วันที่ลาในรอบ HR':'','หมายเหตุ':''}),[14,30,18,42]),'Leave_Skipped');
+      await hrPersistExport(totals,allocation,carryInfo);
+      const now=new Date(),stamp=`${now.getFullYear()}${pad(now.getMonth()+1)}${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+      const fileName=`HR_OT_LAB_${stamp}_source_${state.cycle.start}_to_${state.cycle.end}_dummy_${state.cycle.start}_to_${state.cycle.end}.xlsx`;
+      XLSX.writeFile(wb,fileName);
+      const carry=hrRound2(totals.reduce((s,t)=>s+t.carry,0));
+      toast(`Export HR สำเร็จ ${allocation.rows.length} เวร × 8 ชม. • ทุกคน MT • ทบเดือนหน้า ${carry} ชม.`);
+    } catch(err) {
+      console.error('HR export failed',err);toast(`Export HR ไม่สำเร็จ: ${err.message||err}`);
+    } finally {
+      $('exportBtn').disabled=!unitsReady();$('exportBtn').textContent=oldLabel||'Export HR Excel';
+    }
   }
 
   async function saveCycle() {
@@ -514,7 +871,7 @@
       version:'2.0-all-units', cycle:{...state.cycle},
       units:Object.fromEntries(UNITS.map(u => [u, state.units[u]])),
       calendarSources:state.calendarSources, leaveEvents:state.leaveEvents,
-      calendarSyncedAt:state.calendarSyncedAt, conflicts:state.conflicts, savedAt:now
+      calendarSyncedAt:state.calendarSyncedAt, conflicts:state.conflicts, savedAt:now, hrExport:state.hrExport
     };
     $('saveBtn').disabled=true;
     try {
@@ -555,7 +912,7 @@
     if (error || !data?.payload) return toast('เปิดข้อมูลไม่สำเร็จ');
     const p=data.payload;
     state.cycle=p.cycle; state.units=p.units||{LAB:null,Molec:null,Bacteria:null}; state.rawFiles={LAB:null,Molec:null,Bacteria:null};
-    state.calendarSources=p.calendarSources||[]; state.leaveEvents=p.leaveEvents||[]; state.calendarSyncedAt=p.calendarSyncedAt||null; state.snapshotAt=data.snapshot_at||p.savedAt||null; state.loadedSnapshot=true;
+    state.calendarSources=p.calendarSources||[]; state.leaveEvents=p.leaveEvents||[]; state.calendarSyncedAt=p.calendarSyncedAt||null; state.snapshotAt=data.snapshot_at||p.savedAt||null; state.loadedSnapshot=true; state.hrExport=p.hrExport||null;
     setCycleControls({start:state.cycle.start,end:state.cycle.end});
     for(const unit of UNITS) {
       const u=state.units[unit]; setUnitStatus(unit,u?`✓ โหลด Snapshot · ${u.fileName} · ${u.assignments?.length||0} รายการ`:'ไม่มีไฟล์ใน Snapshot',u?'ok':'error');
