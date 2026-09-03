@@ -1355,3 +1355,35 @@ td{line-height:1.45}
   flex:0 0 auto !important;
   width:auto !important;
 }
+
+
+/* V2.34 — round weekend/public-holiday verification */
+.round-holiday-grid{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:14px;
+}
+.holiday-auto-box,
+.holiday-manual-box{
+  border:1px solid #e1e9ee;
+  border-radius:14px;
+  padding:14px;
+  background:#fafcfd;
+}
+.holiday-auto-box>b,
+.holiday-manual-box>b{
+  display:block;
+  margin-bottom:10px;
+  font-size:14px;
+}
+.date-chip.weekend{
+  background:#edf4f7;
+  color:#526f82;
+}
+.date-chip.holiday{
+  background:#fff3df;
+  color:#8a5a13;
+}
+@media(max-width:800px){
+  .round-holiday-grid{grid-template-columns:1fr}
+}

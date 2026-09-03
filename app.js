@@ -38,6 +38,7 @@
     conflicts: [],
     history: [],
     hrExport: null,
+    manualHolidayDates: [],
     special328Dates: [],
     special328Selected: {},
     ackPeople: {},
@@ -145,6 +146,7 @@
     updateCycleTitle();
     if (old && old !== state.cycle.start) {
       state.calendarSources = []; state.leaveEvents = []; state.calendarSyncedAt = null; state.snapshotAt = null; state.loadedSnapshot = false; state.hrExport = null;
+      state.manualHolidayDates=[]; renderRoundHolidaySettings();
       state.summaryPage=1; state.ackPage=1; state.conflictPage=1; state.leavePage=1; state.ackEmailDrafts={};
       for (const unit of UNITS) {
         const raw = state.rawFiles[unit];
@@ -164,6 +166,7 @@
     const c = getCurrentCycle();
     state.cycle = { start:c.start, end:c.end };
     setCycleControls(c);
+    renderRoundHolidaySettings();
   }
 
   async function init() {
@@ -871,12 +874,15 @@
       byStaff.get(key).push(row);
     }
 
-    const staff=[...byStaff.entries()].map(([key,rows])=>({
-      key,
-      name:rows[0].display_name||'-',
-      employeeCode:rows[0].employee_code||'',
-      hours:Number(rows[0].ot_hours||0)
-    })).sort((a,b)=>a.name.localeCompare(b.name,'th'));
+    const staff=[...byStaff.entries()].map(([key,rows])=>{
+      const employeeCode=rows[0].employee_code||'';
+      return {
+        key,
+        name:staffDisplayNameByCode(rows[0].display_name||'-',employeeCode),
+        employeeCode,
+        hours:Number(rows[0].ot_hours||0)
+      };
+    }).sort((a,b)=>a.name.localeCompare(b.name,'th'));
 
     select.disabled=false;
     const valid=staff.some(s=>s.key===state.ownerPreviewStaffKey);
@@ -918,7 +924,7 @@
     }
 
     empty.hidden=true;
-    if(title) title.textContent=`OT ของ ${rows[0].display_name||''}`;
+    if(title) title.textContent=`OT ของ ${staffDisplayNameByCode(rows[0].display_name||'',rows[0].employee_code||'')}`;
     renderAckCards(rows,list,empty,{readOnly:true,showPerson:false});
   }
 
@@ -927,6 +933,28 @@
      =========================== */
   function normalizeEmployeeCode(value) {
     return String(value||'').replace(/\D/g,'');
+  }
+
+  const STAFF_TITLE_BY_CODE = Object.freeze({
+    '0023167':'น.ส.',
+    '0021573':'น.ส.',
+    '0021537':'น.ส.',
+    '0021761':'น.ส.',
+    '0021671':'น.ส.',
+    '0017654':'น.ส.',
+    '0021414':'น.ส.',
+    '0023216':'น.ส.',
+    '0021672':'น.ส.',
+    '0021415':'นาย'
+  });
+
+  function staffDisplayNameByCode(name, employeeCode) {
+    const raw=String(name||'').trim();
+    const code=String(employeeCode||'').replace(/\D/g,'').padStart(7,'0');
+    const title=STAFF_TITLE_BY_CODE[code]||'';
+    if(!title || !raw) return raw;
+    if(/^(นาย|น\.ส\.|นางสาว|นาง)\s*/.test(raw)) return raw;
+    return `${title} ${raw}`;
   }
 
 
@@ -1271,6 +1299,9 @@
     $('exportBtn').textContent = 'Export HR Excel';
     $('saveBtn').addEventListener('click', saveCycle);
     $('refreshHistoryBtn').addEventListener('click', loadHistory);
+    $('addManualHolidayDateBtn')?.addEventListener('click', addManualHolidayDateFromPicker);
+    $('saveManualHolidayDatesBtn')?.addEventListener('click', saveManualHolidayDates);
+    $('manualHolidayDatePicker')?.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();addManualHolidayDateFromPicker();}});
     $('addSpecial328DateBtn')?.addEventListener('click', addSpecial328DateFromPicker);
     $('saveSpecial328DatesBtn')?.addEventListener('click', saveSpecial328Dates);
     $('special328DatePicker')?.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); addSpecial328DateFromPicker(); } });
@@ -1343,43 +1374,82 @@
       } else validation.push({ type:'ok', text:`${unit}: หัวเดือนใน Excel ตรงกับรอบที่เลือก` });
     } else validation.push({ type:'warn', text:`${unit}: อ่านเดือน/ปีจากหัว Excel ไม่ครบ — ระบบใช้รอบที่เลือกในหน้าเว็บ` });
 
+    const manualHolidaySet = new Set(cleanManualHolidayDates(state.manualHolidayDates));
     const assignments = [];
     let dateBlocks = 0;
+    let nextRowDateBlocks = 0;
+
+    const readDateSlots = (rowIndex) => {
+      const slots = [];
+      let numericCount = 0;
+      for (let c=1; c<=7; c++) {
+        const raw = rows[rowIndex]?.[c];
+        if (raw === null || raw === '') { slots.push(null); continue; }
+        const s = String(raw).trim();
+        const match = s.match(/\d{1,2}/);
+        if (!match) { slots.push(null); continue; }
+        numericCount += 1;
+        const dnum = Number(match[0]);
+        const date = dnum >= 16
+          ? iso(cs.getFullYear(), cs.getMonth()+1, dnum)
+          : iso(ce.getFullYear(), ce.getMonth()+1, dnum);
+        const fileHoliday = s.includes('*');
+        const holiday = fileHoliday || manualHolidaySet.has(date);
+        slots.push({ date, holiday, fileHoliday, manualHoliday:manualHolidaySet.has(date) });
+      }
+      return { slots, numericCount };
+    };
+
     for (let r=0; r<rows.length; r++) {
       const label = String(rows[r]?.[0] ?? '').trim();
       if (!label.startsWith('ตำแหน่ง / วันที่')) continue;
       dateBlocks += 1;
-      const dateSlots = [];
-      for (let c=1; c<=7; c++) {
-        const raw = rows[r]?.[c];
-        if (raw === null || raw === '') { dateSlots.push(null); continue; }
-        const s = String(raw).trim();
-        const match = s.match(/\d{1,2}/);
-        if (!match) { dateSlots.push(null); continue; }
-        const dnum = Number(match[0]);
-        const holiday = s.includes('*');
-        const d = dnum >= 16
-          ? iso(cs.getFullYear(), cs.getMonth()+1, dnum)
-          : iso(ce.getFullYear(), ce.getMonth()+1, dnum);
-        dateSlots.push({ date:d, holiday });
+
+      // Most blocks have dates on this row.
+      // The FIRST block in the actual LAB/Molec file has SUN..SAT here,
+      // with 16..22 on the next row. Support both layouts.
+      let dateRowIndex = r;
+      let parsed = readDateSlots(dateRowIndex);
+      if (!parsed.numericCount && r+1 < rows.length) {
+        const nextParsed = readDateSlots(r+1);
+        if (nextParsed.numericCount) {
+          dateRowIndex = r+1;
+          parsed = nextParsed;
+          nextRowDateBlocks += 1;
+        }
       }
-      for (let rr=r+1; rr<=Math.min(r+4, rows.length-1); rr++) {
-        const duty = String(rows[rr]?.[0] ?? '').trim();
-        if (!/^เวร\s*/i.test(duty)) continue;
+      const dateSlots = parsed.slots;
+      if (!parsed.numericCount) continue;
+
+      // Read every "เวร ..." row until the next weekly date block.
+      // This works for A–D and remains safe if a future file has more rows.
+      for (let rr=dateRowIndex+1; rr<rows.length; rr++) {
+        const rowLabel = String(rows[rr]?.[0] ?? '').trim();
+        if (rowLabel.startsWith('ตำแหน่ง / วันที่')) break;
+        if (!/^เวร\s*/i.test(rowLabel)) continue;
+
         dateSlots.forEach((slot, idx) => {
           const name = String(rows[rr]?.[idx+1] ?? '').trim();
           if (!slot || !name || !between(slot.date, state.cycle.start, state.cycle.end)) return;
-          const d = parseIso(slot.date), weekend = d.getDay() === 0 || d.getDay() === 6;
+          const d = parseIso(slot.date);
+          const weekend = d.getDay() === 0 || d.getDay() === 6;
           const hours = (weekend || slot.holiday) ? 24 : 16;
           assignments.push({
-            unit, date:slot.date, sourceDate:slot.date, duty, name:name.trim(), hours,
-            timeLabel: hours === 24 ? '24 ชม.' : '16 ชม.', holiday:slot.holiday, weekend
+            unit, date:slot.date, sourceDate:slot.date, duty:rowLabel, name:name.trim(), hours,
+            timeLabel: hours === 24 ? '24 ชม.' : '16 ชม.',
+            holiday:slot.holiday,
+            fileHoliday:slot.fileHoliday,
+            manualHoliday:slot.manualHoliday,
+            weekend
           });
         });
       }
     }
+
     if (!dateBlocks) throw new Error('ไม่พบแถว “ตำแหน่ง / วันที่”');
     if (!assignments.length) throw new Error('ไม่พบรายการเวรในไฟล์');
+    if (nextRowDateBlocks) validation.push({type:'ok',text:`${unit}: อ่านบล็อกสัปดาห์แรกที่วันที่อยู่แถวถัดไปแล้ว`});
+
     const uniqueDuties = [...new Set(assignments.map(x => x.duty))];
     if (unit === 'Molec' && uniqueDuties.length > 1) validation.push({ type:'warn', text:`Molec: พบหลายเวร (${uniqueDuties.join(', ')}) กรุณาตรวจว่าเป็นไฟล์ Molec ถูกชุด` });
     const totalHours = assignments.reduce((s,x) => s+x.hours, 0);
@@ -2125,6 +2195,121 @@
   }
 
   /* ===========================
+     ROUND HOLIDAYS
+     - Saturday/Sunday are derived from the selected cycle automatically.
+     - Only public holidays need manual entry.
+     - Public holidays make LAB/Molec actual roster 24 h and are holiday
+       dates for HR dummy allocation.
+     =========================== */
+
+  function cleanManualHolidayDates(list) {
+    const out=[];
+    for (const value of (Array.isArray(list)?list:[])) {
+      const s=String(value||'').trim();
+      if (/^\d{4}-\d{2}-\d{2}$/.test(s) && between(s,state.cycle.start,state.cycle.end)) out.push(s);
+    }
+    return [...new Set(out)].sort();
+  }
+
+  function cycleWeekendDates() {
+    return hrDateList(state.cycle.start,state.cycle.end).filter(hrWeekend);
+  }
+
+  function renderRoundHolidaySettings() {
+    state.manualHolidayDates=cleanManualHolidayDates(state.manualHolidayDates);
+    const weekends=cycleWeekendDates();
+    const weekendList=$('weekendDateList');
+    const manualList=$('manualHolidayDateList');
+
+    if(weekendList) weekendList.innerHTML=weekends.length
+      ? weekends.map(d=>`<span class="date-chip weekend">${esc(fmtThaiDate(d))}</span>`).join('')
+      : '<span class="subtle">ไม่พบเสาร์–อาทิตย์ในรอบนี้</span>';
+
+    if(manualList) {
+      manualList.innerHTML=state.manualHolidayDates.length
+        ? state.manualHolidayDates.map(d=>`<span class="date-chip holiday">${esc(fmtThaiDate(d))}<button type="button" data-remove-manual-holiday="${d}" aria-label="ลบ ${d}">×</button></span>`).join('')
+        : '<span class="subtle">ไม่มีวันหยุดนักขัตฤกษ์ที่เพิ่มเอง</span>';
+      manualList.querySelectorAll('[data-remove-manual-holiday]').forEach(btn=>btn.addEventListener('click',()=>{
+        state.manualHolidayDates=state.manualHolidayDates.filter(d=>d!==btn.dataset.removeManualHoliday);
+        renderRoundHolidaySettings();
+        reparseLabLikeRawFiles();
+      }));
+    }
+  }
+
+  function reparseLabLikeRawFiles() {
+    for(const unit of ['LAB','Molec']) {
+      const raw=state.rawFiles[unit];
+      if(!raw) continue;
+      try {
+        state.units[unit]=parseUnit(unit,raw.buffer,raw.name);
+        const parsed=state.units[unit];
+        const warnCount=parsed.validation.filter(x=>x.type==='warn').length;
+        setUnitStatus(unit,`✓ ${raw.name} · ${parsed.assignments.length} รายการ · ${parsed.totalHours} ชม.${warnCount?` · มี ${warnCount} จุดให้ตรวจ`:''}`,warnCount?'warn':'ok');
+      } catch(err) {
+        state.units[unit]=null;
+        setUnitStatus(unit,`อ่านใหม่ไม่สำเร็จ: ${err.message}`,'error');
+      }
+    }
+    recompute();
+  }
+
+  function addManualHolidayDateFromPicker() {
+    const picker=$('manualHolidayDatePicker');
+    const date=String(picker?.value||'').trim();
+    if(!date) return toast('เลือกวันหยุดนักขัตฤกษ์ก่อน');
+    if(!between(date,state.cycle.start,state.cycle.end)) return toast('วันหยุดต้องอยู่ในรอบ OT ที่เลือก');
+    state.manualHolidayDates=cleanManualHolidayDates([...state.manualHolidayDates,date]);
+    if(picker) picker.value='';
+    renderRoundHolidaySettings();
+    reparseLabLikeRawFiles();
+  }
+
+  async function saveManualHolidayDates() {
+    state.manualHolidayDates=cleanManualHolidayDates(state.manualHolidayDates);
+    if(state.offline || !state.sb) {
+      renderRoundHolidaySettings();
+      reparseLabLikeRawFiles();
+      return toast('ใช้วันหยุดกับรอบนี้แล้ว');
+    }
+
+    const cycleKey=`${state.cycle.start}_${state.cycle.end}`;
+    const {data:existing,error:readError}=await state.sb.from('ot_batches').select('*').eq('cycle_key',cycleKey).limit(1);
+    if(readError) return toast(`อ่านการตั้งค่าไม่สำเร็จ: ${readError.message}`);
+
+    const old=existing?.[0]||null;
+    const payload={
+      ...(old?.payload||{}),
+      cycle:{...state.cycle},
+      manualHolidayDates:[...state.manualHolidayDates],
+      manualHolidayUpdatedAt:new Date().toISOString(),
+      manualHolidayUpdatedBy:String(state.session?.user?.email||'')
+    };
+    const row={
+      cycle_key:cycleKey,
+      cycle_start:state.cycle.start,
+      cycle_end:state.cycle.end,
+      unit_file_names:old?.unit_file_names||{},
+      calendar_synced_at:old?.calendar_synced_at||null,
+      snapshot_at:old?.snapshot_at||null,
+      payload,
+      updated_at:new Date().toISOString()
+    };
+    const {error}=await state.sb.from('ot_batches').upsert(row,{onConflict:'cycle_key'});
+    if(error) return toast(`บันทึกวันหยุดไม่สำเร็จ: ${error.message}`);
+
+    renderRoundHolidaySettings();
+    reparseLabLikeRawFiles();
+    toast(state.manualHolidayDates.length
+      ? `บันทึกวันหยุดนักขัตฤกษ์ ${state.manualHolidayDates.length} วันแล้ว`
+      : 'บันทึกแล้ว: รอบนี้ไม่มีวันหยุดนักขัตฤกษ์เพิ่ม');
+    await writeAppLog('holiday_save','บันทึกวันหยุดนักขัตฤกษ์',
+      state.manualHolidayDates.length?state.manualHolidayDates.map(fmtThaiDate).join(', '):'ไม่มีวันหยุดเพิ่ม',
+      '',currentCycleKey());
+  }
+
+
+  /* ===========================
      HR SPECIAL BENEFIT 00000328
      - 240 THB per 8-hour occurrence.
      - Entitlement comes ONLY from actual duty inside HR-announced dates.
@@ -2142,8 +2327,10 @@
 
 
   async function loadSpecial328Settings() {
+    state.manualHolidayDates = [];
     state.special328Dates = [];
     state.special328Selected = {};
+    renderRoundHolidaySettings();
     renderSpecial328Dates();
     renderSpecial328Eligibility();
 
@@ -2162,14 +2349,17 @@
     }
 
     const payload = data?.[0]?.payload || {};
+    state.manualHolidayDates = cleanManualHolidayDates(payload.manualHolidayDates || []);
     state.special328Dates = cleanSpecial328Dates(payload.special328Dates || []);
     state.special328Selected =
       payload.special328Selected && typeof payload.special328Selected === 'object'
         ? { ...payload.special328Selected }
         : {};
 
+    renderRoundHolidaySettings();
     renderSpecial328Dates();
     renderSpecial328Eligibility();
+    if(state.rawFiles.LAB || state.rawFiles.Molec) reparseLabLikeRawFiles();
   }
 
   function cleanSpecial328Dates(list) {
@@ -2414,15 +2604,15 @@
     'ปิยดา':{fullName:'น.ส. ปิยดา แมกไม้รักษา',employeeCode:'0020533'},
     'ศศิวิมล':{fullName:'น.ส. ศศิวิมล แสนเสนา',employeeCode:'0020737'},
     'วัชระชัย':{fullName:'นาย วัชรชัย มูลประเสริฐ',employeeCode:'0020739'},
-    'พัชรวรรณ':{fullName:'พัชรวรรณ รัตนพิบูลย์',employeeCode:'0021537'},
-    'อภิชฎา':{fullName:'อภิชฎา อุ่นเมือง',employeeCode:'0021414'},
-    'ชินกร':{fullName:'ชินกร วัชระวรรณชัย',employeeCode:'0021415'},
-    'พิมพ์มาดา':{fullName:'พิมพ์มาดา อนันตกูล',employeeCode:'0021671'},
-    'ฐิติยา':{fullName:'ฐิติยา ตู้เจริญ',employeeCode:'0021672'},
-    'นารีรัตน์':{fullName:'นารีรัตน์ หมีทอง',employeeCode:'0023167'},
-    'ญาธิป':{fullName:'ญาธิป พุ่มคง',employeeCode:'0023216'},
+    'พัชรวรรณ':{fullName:'น.ส. พัชรวรรณ รัตนพิบูลย์',employeeCode:'0021537'},
+    'อภิชฎา':{fullName:'น.ส. อภิชฎา อุ่นเมือง',employeeCode:'0021414'},
+    'ชินกร':{fullName:'นาย ชินกร วัชระวรรณชัย',employeeCode:'0021415'},
+    'พิมพ์มาดา':{fullName:'น.ส. พิมพ์มาดา อนันตกูล',employeeCode:'0021671'},
+    'ฐิติยา':{fullName:'น.ส. ฐิติยา ตู้เจริญ',employeeCode:'0021672'},
+    'นารีรัตน์':{fullName:'น.ส. นารีรัตน์ หมีทอง',employeeCode:'0023167'},
+    'ญาธิป':{fullName:'น.ส. ญาธิป พุ่มคง',employeeCode:'0023216'},
     'ปาลีรัตน์':{fullName:'ปาลีรัตน์ รังรักษ์รัตนากร',employeeCode:'0026192'},
-    'วารีวัลย์':{fullName:'วารีวัลย์ หุ่นเทอดไทย',employeeCode:'0017654'},
+    'วารีวัลย์':{fullName:'น.ส. วารีวัลย์ หุ่นเทอดไทย',employeeCode:'0017654'},
     'ศรัณย์':{fullName:'นาย ศรัณย์ สุรวัฒน์เดชา',employeeCode:'0026230'},
     'อติชาติ':{fullName:'นาย อติชาติ ยิ้มโสด',employeeCode:'0026231'},
     'ณรงค์ชัย':{fullName:'นาย ณรงค์ชัย คำมูลตรี',employeeCode:'0027961'},
@@ -2434,7 +2624,8 @@
     const key = normName(name);
     const info = HR_STAFF_MASTER[key];
     if (!info) return null;
-    return { nick:key, fullName:info.fullName, employeeCode:String(info.employeeCode).replace(/\D/g,'').padStart(7,'0') };
+    const employeeCode=String(info.employeeCode).replace(/\D/g,'').padStart(7,'0');
+    return { nick:key, fullName:staffDisplayNameByCode(info.fullName,employeeCode), employeeCode };
   }
   function hrDateList(start,end) {
     const out=[]; let d=start, guard=0;
@@ -2443,7 +2634,9 @@
   }
   function hrWeekend(date) { const day=parseIso(date).getDay(); return day===0 || day===6; }
   function hrHolidayDates(assignments) {
-    return new Set((assignments||[]).filter(x=>x.holiday).map(x=>x.date));
+    const out=new Set(cleanManualHolidayDates(state.manualHolidayDates));
+    (assignments||[]).filter(x=>x.holiday).forEach(x=>out.add(x.date));
+    return out;
   }
   function hrIsDummyHoliday(date,holidaySet) { return hrWeekend(date) || holidaySet.has(date); }
   function hrActualRate() { return HR_MT.baseRate; }
@@ -2516,23 +2709,92 @@
     const dates=hrDateList(state.cycle.start,state.cycle.end), dateCount=Math.max(1,dates.length);
     const leaveMap=new Map(totals.map(t=>[t.employeeCode,hrLeaveDateSetForName(t.nick)]));
     const totalUnits=totals.reduce((s,t)=>s+Math.max(0,Math.floor((Number(t.total||0)+1e-7)/8)),0);
-    const dateInfos=dates.map((date,index)=>({date,index,slots:hrAllowedSlots(date,holidaySet),target:0,slotTargets:new Map()}));
-    const totalWeight=Math.max(1,dateInfos.reduce((s,x)=>s+x.slots.length,0));
-    let base=0;
-    dateInfos.forEach(info=>{const ideal=totalUnits*info.slots.length/totalWeight;info.ideal=ideal;info.frac=ideal-Math.floor(ideal);info.target=Math.floor(ideal);base+=info.target;});
-    let extra=Math.max(0,totalUnits-base);
-    dateInfos.slice().sort((a,b)=>b.frac-a.frac||a.index-b.index).slice(0,extra).forEach(x=>x.target++);
+
+    // กระจายจำนวนชื่อในตาราง Dummy ให้ใกล้เคียงกันทุกวันก่อน
+    // ถ้าหารจำนวนวันไม่ลงตัว จำนวนรวมต่อวันจะต่างกันได้สูงสุด 1 รายการ
+    // 00000328 ที่แสดงในชีท “ตาราง” นับรวมในจำนวนต่อวันด้วย
+    const reservedByDate=new Map(), reservedByCell=new Map();
+    for(const r of (reservedRows||[])){
+      reservedByDate.set(r.date,(reservedByDate.get(r.date)||0)+1);
+      const k=`${r.date}|${r.slot}`;
+      reservedByCell.set(k,(reservedByCell.get(k)||0)+1);
+    }
+    const totalVisibleUnits=totalUnits+(reservedRows||[]).length;
+    const dailyBase=Math.floor(totalVisibleUnits/dateCount);
+    const dailyExtra=Math.max(0,totalVisibleUnits-dailyBase*dateCount);
+    const dateInfos=dates.map((date,index)=>({
+      date,index,slots:hrAllowedSlots(date,holidaySet),
+      reserved:reservedByDate.get(date)||0,
+      totalTarget:dailyBase,
+      target:0,slotTargets:new Map()
+    }));
+
+    // กระจายวัน +1 ให้ทั่วทั้งรอบ ไม่กองต้น/ท้ายเดือน
+    let spread=0;
+    for(const info of dateInfos){
+      spread+=dailyExtra;
+      if(spread>=dateCount){ info.totalTarget++; spread-=dateCount; }
+    }
+
+    // ถ้าวันที่มี 00000328 มากกว่าค่าเป้าหมาย ต้องยกเป้าหมายวันนั้นขึ้น
+    // และหักจากวันอื่นเพื่อให้ยอดรวมทั้งรอบไม่เปลี่ยน
+    let needShift=0;
+    for(const info of dateInfos){
+      if(info.reserved>info.totalTarget){
+        needShift+=info.reserved-info.totalTarget;
+        info.totalTarget=info.reserved;
+      }
+    }
+    while(needShift>0){
+      const donors=dateInfos
+        .filter(x=>x.totalTarget>x.reserved)
+        .sort((a,b)=>b.totalTarget-a.totalTarget||b.index-a.index);
+      if(!donors.length) break;
+      for(const info of donors){
+        if(needShift<=0) break;
+        info.totalTarget--; needShift--;
+      }
+    }
+
+    // เป้าหมายของ OT ปกติ = จำนวนรวมต่อวัน - 00000328 ที่จองไว้แล้ว
+    // แบ่งลงแต่ละ slot โดยคำนึงถึงเพดาน 6 ชื่อต่อช่องของ Template
     dateInfos.forEach(info=>{
-      const n=info.slots.length,b=Math.floor(info.target/n),rem=info.target%n,start=info.index%n;
-      info.slots.forEach(s=>info.slotTargets.set(s,b));
-      for(let i=0;i<rem;i++){const s=info.slots[(start+i)%n];info.slotTargets.set(s,(info.slotTargets.get(s)||0)+1);}
+      info.target=Math.max(0,info.totalTarget-info.reserved);
+      info.slots.forEach(s=>info.slotTargets.set(s,0));
+      let left=info.target, turn=0;
+      const slots=info.slots.slice();
+      while(left>0 && turn++<100){
+        const candidates=slots.filter(s=>{
+          const reserved=reservedByCell.get(`${info.date}|${s}`)||0;
+          return reserved+(info.slotTargets.get(s)||0)<6;
+        }).sort((a,b)=>{
+          const ca=(reservedByCell.get(`${info.date}|${a}`)||0)+(info.slotTargets.get(a)||0);
+          const cb=(reservedByCell.get(`${info.date}|${b}`)||0)+(info.slotTargets.get(b)||0);
+          if(ca!==cb) return ca-cb;
+          const ra=(slots.indexOf(a)-info.index+slots.length)%slots.length;
+          const rb=(slots.indexOf(b)-info.index+slots.length)%slots.length;
+          return ra-rb;
+        });
+        if(!candidates.length) break;
+        const s=candidates[0];
+        info.slotTargets.set(s,(info.slotTargets.get(s)||0)+1);
+        left--;
+      }
+      info.capacityShortfall=left;
     });
+
     const infoMap=new Map(dateInfos.map(x=>[x.date,x])), cells=[];
-    dateInfos.forEach(info=>info.slots.forEach(slot=>cells.push({date:info.date,index:info.index,slot,target:info.slotTargets.get(slot)||0,assigned:0})));
+    dateInfos.forEach(info=>info.slots.forEach(slot=>cells.push({
+      date:info.date,index:info.index,slot,
+      reserved:reservedByCell.get(`${info.date}|${slot}`)||0,
+      target:info.slotTargets.get(slot)||0,assigned:0
+    })));
     const rows=[], byStaffDay=new Map(), dateOcc=new Map(), staffDates=new Map(), existingByStaff=new Map();
     const daySlots=(code,date)=>{const k=`${code}|${date}`;if(!byStaffDay.has(k))byStaffDay.set(k,new Set());return byStaffDay.get(k);};
     const datesForStaff=code=>{if(!staffDates.has(code))staffDates.set(code,new Set());return staffDates.get(code);};
     const existingFor=code=>{if(!existingByStaff.has(code))existingByStaff.set(code,[]);return existingByStaff.get(code);};
+    const normalDateOcc=date=>dateOcc.get(date)||0;
+    const totalDateOcc=date=>normalDateOcc(date)+(reservedByDate.get(date)||0);
 
     // เวลางานประจำ จ-ศ 08:00-16:00 ต้องนับรวมตอนตรวจ "ทำงานต่อเนื่องไม่เกิน 16 ชม."
     // วันหยุด/เสาร์-อาทิตย์ไม่มี baseline นี้
@@ -2544,20 +2806,34 @@
       }
     }
 
+    // 00000328 เป็นรายการจองไว้ก่อน: ใช้ตรวจเวลาต่อเนื่อง/ซ้ำ แต่ไม่ถือเป็น OT ปกติ
     for(const r of (reservedRows||[])){
       daySlots(r.employeeCode,r.date).add(r.slot);
       datesForStaff(r.employeeCode).add(r.date);
       existingFor(r.employeeCode).push(r);
-      dateOcc.set(r.date,(dateOcc.get(r.date)||0)+1);
     }
-    const canUse=(t,cell,overflow=false)=>{
-      if(!overflow && cell.assigned>=cell.target) return false;
-      if(overflow && cell.assigned>=6) return false;
+
+    const personCanUse=(t,cell)=>{
       if(leaveMap.get(t.employeeCode)?.has(cell.date)) return false;
       const used=daySlots(t.employeeCode,cell.date);
       if(used.has(cell.slot) || used.size>=2) return false;
       if(hrWouldExceed16(existingFor(t.employeeCode),cell.date,cell.slot)) return false;
       return true;
+    };
+    const canUseStrict=(t,cell)=>{
+      if(cell.assigned>=cell.target) return false;
+      if(cell.assigned+cell.reserved>=6) return false;
+      return personCanUse(t,cell);
+    };
+    const canUseWithinDay=(t,cell)=>{
+      const info=infoMap.get(cell.date);
+      if(normalDateOcc(cell.date)>=info.target) return false;
+      if(cell.assigned+cell.reserved>=6) return false;
+      return personCanUse(t,cell);
+    };
+    const canUseOverflow=(t,cell)=>{
+      if(cell.assigned+cell.reserved>=6) return false;
+      return personCanUse(t,cell);
     };
     const add=(t,cell)=>{
       const times=hrSlotTimes(cell.slot), holiday=hrIsDummyHoliday(cell.date,holidaySet);
@@ -2565,42 +2841,71 @@
         employeeCode:t.employeeCode,nick:t.nick,fullName:t.fullName,date:cell.date,slot:cell.slot,
         ...times,type:holiday?2:1,claimCode:holiday?HR_MT.holidayCode:HR_MT.normalCode
       });
-      cell.assigned++;dateOcc.set(cell.date,(dateOcc.get(cell.date)||0)+1);
+      cell.assigned++;dateOcc.set(cell.date,normalDateOcc(cell.date)+1);
       daySlots(t.employeeCode,cell.date).add(cell.slot);datesForStaff(t.employeeCode).add(cell.date);existingFor(t.employeeCode).push(rows[rows.length-1]);
     };
+
     const remaining=new Map(), desired=new Map(), assigned=new Map();
     totals.forEach(t=>{const n=Math.max(0,Math.floor((Number(t.total||0)+1e-7)/8));remaining.set(t.employeeCode,n);desired.set(t.employeeCode,n);assigned.set(t.employeeCode,0);});
     const remainingTotal=()=>[...remaining.values()].reduce((s,n)=>s+n,0);
+
+    // รอบ 1: รักษาทั้งจำนวนรวมต่อวันและจำนวนต่อ slot ตามเป้า
     let round=0,progress=true;
-    while(remainingTotal()>0 && progress && round++<120) {
+    while(remainingTotal()>0 && progress && round++<160) {
       progress=false;
       const order=totals.slice().sort((a,b)=>(remaining.get(b.employeeCode)||0)-(remaining.get(a.employeeCode)||0)||a.nick.localeCompare(b.nick,'th'));
       order.forEach((t,staffIndex)=>{
         const left=remaining.get(t.employeeCode)||0;if(left<=0)return;
         const prevDates=datesForStaff(t.employeeCode), candidates=[];
         for(const cell of cells) {
-          if(!canUse(t,cell,false)) continue;
-          const info=infoMap.get(cell.date), occ=dateOcc.get(cell.date)||0;
+          if(!canUseStrict(t,cell)) continue;
+          const info=infoMap.get(cell.date);
           const adjacent=(prevDates.has(addDays(cell.date,-1))?1:0)+(prevDates.has(addDays(cell.date,1))?1:0);
           const used=daySlots(t.employeeCode,cell.date).size;
           const rotation=(cell.index-((staffIndex*3+round)%dateCount)+dateCount)%dateCount;
-          candidates.push({cell,score:[adjacent,used,cell.assigned/Math.max(1,cell.target),occ/Math.max(1,info.target),rotation,cell.slot]});
+          const dayGap=info.totalTarget-totalDateOcc(cell.date);
+          candidates.push({cell,score:[-dayGap,adjacent,used,(cell.assigned+cell.reserved)/Math.max(1,cell.target+cell.reserved),rotation,cell.slot]});
         }
         if(!candidates.length)return;
         candidates.sort((a,b)=>{for(let i=0;i<a.score.length;i++){if(a.score[i]!==b.score[i])return a.score[i]-b.score[i];}return 0;});
         add(t,candidates[0].cell);remaining.set(t.employeeCode,left-1);assigned.set(t.employeeCode,(assigned.get(t.employeeCode)||0)+1);progress=true;
       });
     }
+
+    // รอบ 2: ถ้า slot ใดติดเงื่อนไข ให้โยกไป slot อื่น “ในวันเดียวกัน” ก่อน
+    // เพื่อรักษาจำนวนคนรวมต่อวันให้เท่ากันตามเป้า
+    let rebalance=0,rebalanceProgress=true;
+    while(remainingTotal()>0 && rebalanceProgress && rebalance++<160){
+      rebalanceProgress=false;
+      for(const t of totals){
+        const left=remaining.get(t.employeeCode)||0;if(left<=0)continue;
+        const candidates=[];
+        for(const cell of cells){
+          if(!canUseWithinDay(t,cell)) continue;
+          const info=infoMap.get(cell.date);
+          const gap=info.totalTarget-totalDateOcc(cell.date);
+          const adjacent=(datesForStaff(t.employeeCode).has(addDays(cell.date,-1))?1:0)+(datesForStaff(t.employeeCode).has(addDays(cell.date,1))?1:0);
+          candidates.push({cell,score:[-gap,adjacent,cell.assigned+cell.reserved,cell.index,cell.slot]});
+        }
+        if(!candidates.length)continue;
+        candidates.sort((a,b)=>{for(let i=0;i<a.score.length;i++){if(a.score[i]!==b.score[i])return a.score[i]-b.score[i];}return 0;});
+        add(t,candidates[0].cell);remaining.set(t.employeeCode,left-1);assigned.set(t.employeeCode,(assigned.get(t.employeeCode)||0)+1);rebalanceProgress=true;
+      }
+    }
+
+    // รอบ 3 ใช้เฉพาะกรณีเงื่อนไขวันลา/16 ชม. ทำให้เป้ารายวันทำไม่ได้จริง
+    // เลือกวันที่มีจำนวนรวมน้อยที่สุดก่อน เพื่อให้ความต่างน้อยที่สุด
     let fallback=0;
-    while(remainingTotal()>0 && fallback++<120) {
+    while(remainingTotal()>0 && fallback++<160) {
       let moved=false;
       for(const t of totals) {
         const left=remaining.get(t.employeeCode)||0;if(left<=0)continue;
         const candidates=[];
         for(const cell of cells) {
-          if(!canUse(t,cell,true))continue;
+          if(!canUseOverflow(t,cell))continue;
+          const info=infoMap.get(cell.date);
           const adjacent=(datesForStaff(t.employeeCode).has(addDays(cell.date,-1))?1:0)+(datesForStaff(t.employeeCode).has(addDays(cell.date,1))?1:0);
-          candidates.push({cell,score:[adjacent,cell.assigned,dateOcc.get(cell.date)||0,cell.index,cell.slot]});
+          candidates.push({cell,score:[totalDateOcc(cell.date),Math.max(0,totalDateOcc(cell.date)-info.totalTarget),adjacent,cell.assigned+cell.reserved,cell.index,cell.slot]});
         }
         if(!candidates.length)continue;
         candidates.sort((a,b)=>{for(let i=0;i<a.score.length;i++){if(a.score[i]!==b.score[i])return a.score[i]-b.score[i];}return 0;});
@@ -2608,6 +2913,7 @@
       }
       if(!moved)break;
     }
+
     totals.forEach(t=>{
       const claimedUnits=assigned.get(t.employeeCode)||0;
       t.claimedUnits=claimedUnits;t.claimed=hrRound2(claimedUnits*8);t.carry=hrRound2(t.total-t.claimed);
@@ -2619,8 +2925,18 @@
     rows.sort((a,b)=>a.date.localeCompare(b.date)||a.slot-b.slot||a.nick.localeCompare(b.nick,'th'));
     const leaveSkipped=[];
     totals.forEach(t=>[...(leaveMap.get(t.employeeCode)||[])].sort().forEach(date=>leaveSkipped.push({employeeCode:t.employeeCode,fullName:t.fullName,date})));
-    return {rows,leaveSkipped};
+
+    const dailyCounts=dateInfos.map(info=>({
+      date:info.date,target:info.totalTarget,
+      normal:normalDateOcc(info.date),special:info.reserved,
+      total:totalDateOcc(info.date)
+    }));
+    const countValues=dailyCounts.map(x=>x.total);
+    const dailyMin=countValues.length?Math.min(...countValues):0;
+    const dailyMax=countValues.length?Math.max(...countValues):0;
+    return {rows,leaveSkipped,dailyCounts,dailyMin,dailyMax,dailyTargetBase:dailyBase};
   }
+
   function hrSourceRows(totals) {
     const out=[];
     totals.forEach(t=>t.rows.forEach(x=>{
@@ -2738,7 +3054,9 @@
     state.hrExport={
       version:'HR-MT-1.0',exportedAt:now,baseType:'MT',baseRate:HR_MT.baseRate,
       carrySourceCycleKey:carryInfo.sourceCycleKey,carrySourceFound:carryInfo.found,carryOutByEmployeeCode,
-      totalDummyRows:allocation.rows.length,totalClaimedHours:hrRound2(allocation.rows.length*8),special328Dates:[...state.special328Dates],special328Rows:special328Rows.length,special328Pay:hrRound2(special328Rows.length*HR_SPECIAL_328.amountPer8h)
+      totalDummyRows:allocation.rows.length,totalClaimedHours:hrRound2(allocation.rows.length*8),
+      dummyDailyMin:Number(allocation.dailyMin||0),dummyDailyMax:Number(allocation.dailyMax||0),dummyDailyCounts:allocation.dailyCounts||[],
+      special328Dates:[...state.special328Dates],special328Rows:special328Rows.length,special328Pay:hrRound2(special328Rows.length*HR_SPECIAL_328.amountPer8h)
     };
     if(state.offline || !state.sb) return;
     const cycleKey=`${state.cycle.start}_${state.cycle.end}`;
@@ -2833,7 +3151,9 @@
       version:'2.0-all-units', cycle:{...state.cycle},
       units:Object.fromEntries(UNITS.map(u => [u, state.units[u]])),
       calendarSources:state.calendarSources, leaveEvents:state.leaveEvents,
-      calendarSyncedAt:state.calendarSyncedAt, conflicts:state.conflicts, special328Dates:[...state.special328Dates], special328Selected:{...state.special328Selected}, savedAt:now, hrExport:state.hrExport
+      calendarSyncedAt:state.calendarSyncedAt, conflicts:state.conflicts,
+      manualHolidayDates:[...state.manualHolidayDates],
+      special328Dates:[...state.special328Dates], special328Selected:{...state.special328Selected}, savedAt:now, hrExport:state.hrExport
     };
     $('saveBtn').disabled=true;
     try {
@@ -2884,7 +3204,11 @@
     if (error || !data?.payload) return toast('เปิดข้อมูลไม่สำเร็จ');
     const p=data.payload;
     state.cycle=p.cycle; state.units=p.units||{LAB:null,Molec:null,Bacteria:null}; state.rawFiles={LAB:null,Molec:null,Bacteria:null};
-    state.calendarSources=p.calendarSources||[]; state.leaveEvents=p.leaveEvents||[]; state.calendarSyncedAt=p.calendarSyncedAt||null; state.snapshotAt=data.snapshot_at||p.savedAt||null; state.loadedSnapshot=true; state.hrExport=p.hrExport||null; state.special328Dates=cleanSpecial328Dates(p.special328Dates||[]); state.special328Selected=(p.special328Selected&&typeof p.special328Selected==='object')?{...p.special328Selected}:{}; renderSpecial328Dates(); renderSpecial328Eligibility();
+    state.calendarSources=p.calendarSources||[]; state.leaveEvents=p.leaveEvents||[]; state.calendarSyncedAt=p.calendarSyncedAt||null; state.snapshotAt=data.snapshot_at||p.savedAt||null; state.loadedSnapshot=true; state.hrExport=p.hrExport||null;
+    state.manualHolidayDates=cleanManualHolidayDates(p.manualHolidayDates||[]);
+    state.special328Dates=cleanSpecial328Dates(p.special328Dates||[]);
+    state.special328Selected=(p.special328Selected&&typeof p.special328Selected==='object')?{...p.special328Selected}:{};
+    renderRoundHolidaySettings(); renderSpecial328Dates(); renderSpecial328Eligibility();
     setCycleControls({start:state.cycle.start,end:state.cycle.end});
     for(const unit of UNITS) {
       const u=state.units[unit]; setUnitStatus(unit,u?`✓ ${u.fileName} · ${u.assignments?.length||0} รายการ`:'ไม่มีไฟล์ในรอบนี้',u?'ok':'error');

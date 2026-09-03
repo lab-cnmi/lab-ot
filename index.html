@@ -7,13 +7,13 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="default" />
   <meta name="apple-mobile-web-app-title" content="LAB OT" />
-  <link rel="manifest" href="manifest.webmanifest?v=20260903-16" />
+  <link rel="manifest" href="manifest.webmanifest?v=20260903-19" />
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
   <title>LAB OT — LAB / Molec / Bacteria</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=20260903-v231" />
+  <link rel="stylesheet" href="styles.css?v=20260903-v234" />
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3EOT%3C/text%3E%3C/svg%3E">
   <style>
     /* Critical: author CSS (.center-shell { display:grid }) must not override HTML hidden state */
@@ -100,9 +100,35 @@
             <button id="currentCycleBtn" class="secondary-btn compact">รอบปัจจุบัน</button>
           </div>
         </section>
+        <section id="roundHolidayCard" class="card round-holiday-card">
+          <div class="section-head">
+            <div>
+              <div class="section-kicker">ขั้นตอนที่ 1</div>
+              <h2>วันหยุดรอบนี้</h2>
+            </div>
+          </div>
+          <div class="round-holiday-grid">
+            <div class="holiday-auto-box">
+              <b>เสาร์–อาทิตย์</b>
+              <div id="weekendDateList" class="date-chip-list"></div>
+            </div>
+            <div class="holiday-manual-box">
+              <b>วันหยุดนักขัตฤกษ์</b>
+              <div class="special-rate-controls">
+                <label>วันที่
+                  <input id="manualHolidayDatePicker" type="date" />
+                </label>
+                <button id="addManualHolidayDateBtn" class="secondary-btn compact" type="button">เพิ่ม</button>
+                <button id="saveManualHolidayDatesBtn" class="primary-btn compact" type="button">บันทึกวันหยุด</button>
+              </div>
+              <div id="manualHolidayDateList" class="date-chip-list"></div>
+            </div>
+          </div>
+        </section>
+
         <section class="card">
           <div class="section-head">
-            <div><div class="section-kicker">ขั้นตอนที่ 1</div><h2>เลือกไฟล์เวร 3 หน่วย</h2></div>
+            <div><div class="section-kicker">ขั้นตอนที่ 2</div><h2>เลือกไฟล์เวร 3 หน่วย</h2></div>
             <span id="unitReadyBadge" class="pill">0 / 3 หน่วย</span>
           </div>
           <div class="unit-upload-grid">
@@ -130,7 +156,7 @@
         <section id="special328Card" class="card special328-card compact-special-card">
           <div class="section-head">
             <div>
-              <div class="section-kicker">ขั้นตอนที่ 2</div>
+              <div class="section-kicker">ขั้นตอนที่ 3</div>
               <h2>วันที่สิทธิ์ 00000328</h2>
               
             </div>
@@ -147,7 +173,7 @@
         </section>
 
         <section class="card sync-card">
-          <div class="step-no">3</div>
+          <div class="step-no">4</div>
           <div class="sync-copy">
             <h2>ดึงวันลา</h2>
             <p>กดเพื่อใช้วันลาล่าสุดตรวจเทียบกับตารางเวร</p>
@@ -401,6 +427,7 @@
           <h3>สำหรับผู้ทำรอบ OT</h3>
           <ol class="guide-steps">
             <li><b>เลือกรอบเดือน</b><span>เช่น รอบเดือนกันยายน คือวันที่ 16 สิงหาคม ถึง 15 กันยายน</span></li>
+            <li><b>ตรวจวันหยุดรอบนี้</b><span>เสาร์–อาทิตย์ระบบแสดงให้อัตโนมัติ ถ้ามีวันหยุดนักขัตฤกษ์ให้เพิ่มวันที่ก่อนอ่านตาราง</span></li>
             <li><b>เลือกไฟล์เวรให้ครบ 3 หน่วย</b><span>เลือก LAB, Molec และ Bacteria ของรอบนั้น</span></li>
             <li><b>ใส่วันที่ 00000328 ถ้ามี</b><span>ใส่เฉพาะวันที่ HR แจ้งช่วงปีใหม่หรือสงกรานต์ ถ้าเดือนไหนไม่มีให้ข้าม</span></li>
             <li><b>ดึงวันลา</b><span>ตรวจจำนวนวันลาที่ดึงมา และดูว่ามีรายการใดตรงกับเวรหรือไม่</span></li>
@@ -579,7 +606,7 @@
     };
     window.PSC_OT_CONFIG = window.LAB_OT_CONFIG;
   </script>
-  <script src="app.js?v=20260903-32"></script>
+  <script src="app.js?v=20260903-35"></script>
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(console.warn));
