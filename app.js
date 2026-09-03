@@ -245,6 +245,81 @@
     if (error) { $('loginError').textContent = error.message || 'เข้าสู่ระบบไม่สำเร็จ'; $('loginError').hidden=false; }
   }
 
+
+  function openPasswordModal() {
+    if (!state.session?.user?.email || state.offline) {
+      return toast('โหมดทดลองไม่สามารถเปลี่ยนรหัสผ่านได้');
+    }
+    const modal=$('passwordModal');
+    const form=$('passwordChangeForm');
+    const err=$('passwordChangeError');
+    if (form) form.reset();
+    if (err) { err.hidden=true; err.textContent=''; }
+    if (modal) modal.hidden=false;
+    setTimeout(()=>$('currentPasswordInput')?.focus(),30);
+  }
+
+  function closePasswordModal() {
+    const modal=$('passwordModal');
+    const form=$('passwordChangeForm');
+    const err=$('passwordChangeError');
+    if (modal) modal.hidden=true;
+    if (form) form.reset();
+    if (err) { err.hidden=true; err.textContent=''; }
+  }
+
+  async function changeOwnPassword(e) {
+    e.preventDefault();
+    if (state.offline || !state.sb || !state.session?.user?.email) {
+      return toast('ไม่สามารถเปลี่ยนรหัสผ่านในโหมดทดลองได้');
+    }
+
+    const currentPassword=String($('currentPasswordInput')?.value||'');
+    const newPassword=String($('newPasswordInput')?.value||'');
+    const confirmPassword=String($('confirmPasswordInput')?.value||'');
+    const errorEl=$('passwordChangeError');
+    const saveBtn=$('savePasswordBtn');
+
+    const showError=msg=>{
+      if (errorEl) { errorEl.textContent=msg; errorEl.hidden=false; }
+    };
+    if (errorEl) { errorEl.hidden=true; errorEl.textContent=''; }
+
+    if (!currentPassword) return showError('กรุณากรอกรหัสผ่านเดิม');
+    if (newPassword.length < 8) return showError('รหัสผ่านใหม่ต้องมีอย่างน้อย 8 ตัวอักษร');
+    if (newPassword !== confirmPassword) return showError('ยืนยันรหัสผ่านใหม่ไม่ตรงกัน');
+    if (newPassword === currentPassword) return showError('รหัสผ่านใหม่ต้องไม่เหมือนรหัสเดิม');
+
+    const email=String(state.session.user.email||'').trim().toLowerCase();
+    if (saveBtn) { saveBtn.disabled=true; saveBtn.textContent='กำลังบันทึก…'; }
+
+    try {
+      // ตรวจรหัสเดิมอีกครั้งก่อนเปลี่ยน เพื่อป้องกันคนที่เปิดเครื่องค้างไว้เปลี่ยนรหัสโดยไม่รู้รหัสเดิม
+      const { error: verifyError } = await state.sb.auth.signInWithPassword({
+        email,
+        password: currentPassword
+      });
+      if (verifyError) {
+        showError('รหัสผ่านเดิมไม่ถูกต้อง');
+        return;
+      }
+
+      const { data, error: updateError } = await state.sb.auth.updateUser({
+        password: newPassword
+      });
+      if (updateError) throw updateError;
+
+      if (data?.user) state.session.user = data.user;
+      closePasswordModal();
+      toast('เปลี่ยนรหัสผ่านเรียบร้อยแล้ว');
+    } catch (err) {
+      console.error('change password failed', err);
+      showError(err?.message || 'เปลี่ยนรหัสผ่านไม่สำเร็จ กรุณาลองใหม่');
+    } finally {
+      if (saveBtn) { saveBtn.disabled=false; saveBtn.textContent='บันทึกรหัสใหม่'; }
+    }
+  }
+
   async function logout() {
     if (state.sb && !state.offline) await state.sb.auth.signOut();
     location.reload();
@@ -253,6 +328,13 @@
   function bindUI() {
     $('loginForm').addEventListener('submit', login);
     $('logoutBtn').addEventListener('click', logout);
+    $('changePasswordBtn')?.addEventListener('click', openPasswordModal);
+    $('closePasswordModalBtn')?.addEventListener('click', closePasswordModal);
+    $('cancelPasswordBtn')?.addEventListener('click', closePasswordModal);
+    $('passwordChangeForm')?.addEventListener('submit', changeOwnPassword);
+    $('passwordModal')?.addEventListener('click', e => {
+      if (e.target === $('passwordModal')) closePasswordModal();
+    });
     $('viewModeBtn')?.addEventListener('click', e => { e.stopPropagation(); toggleViewModeMenu(); });
     $('viewModeMenu')?.addEventListener('click', e => {
       const option = e.target.closest('[data-view-role]');

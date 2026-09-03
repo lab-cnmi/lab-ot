@@ -318,3 +318,66 @@ td{line-height:1.45}
   font-size:14px;
   font-weight:600;
 }
+
+
+/* V2.13 — self-service password change */
+.modal-backdrop{
+  position:fixed;
+  inset:0;
+  z-index:2000;
+  display:grid;
+  place-items:center;
+  padding:20px;
+  background:rgba(28,43,56,.42);
+  backdrop-filter:blur(2px);
+}
+.modal-card{
+  width:min(460px,100%);
+  background:#fff;
+  border:1px solid #dfe7ed;
+  border-radius:20px;
+  padding:20px;
+  box-shadow:0 24px 70px rgba(22,39,52,.22);
+}
+.modal-head{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:12px;
+  margin-bottom:14px;
+}
+.modal-head h2{
+  margin:0 0 3px;
+  font-size:20px;
+  font-weight:700;
+}
+.modal-head p{
+  margin:0;
+  color:#718596;
+  font-size:13px;
+}
+.icon-btn{
+  width:34px;
+  height:34px;
+  border:0;
+  border-radius:10px;
+  background:#f2f6f8;
+  color:#587083;
+  cursor:pointer;
+  font-size:22px;
+  line-height:1;
+}
+.modal-actions{
+  display:flex;
+  justify-content:flex-end;
+  gap:8px;
+  margin-top:4px;
+}
+.password-modal input[type=password]{
+  width:100%;
+}
+@media(max-width:760px){
+  .topbar-actions{flex-wrap:wrap;justify-content:flex-end}
+  #changePasswordBtn{order:3}
+  #logoutBtn{order:4}
+}
