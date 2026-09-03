@@ -819,12 +819,12 @@
       list.innerHTML='';
       empty.hidden=false;
       empty.textContent='เลือกเจ้าหน้าที่เพื่อดูตัวอย่าง';
-      if(title) title.textContent='ตัวอย่างหน้าจอ Staff';
+      if(title) title.textContent='เลือกเจ้าหน้าที่เพื่อดู OT';
       return;
     }
 
     empty.hidden=true;
-    if(title) title.textContent=`ตัวอย่างหน้าจอ Staff · ${rows[0].display_name||''}`;
+    if(title) title.textContent=`OT ของ ${rows[0].display_name||''}`;
     renderAckCards(rows,list,empty,{readOnly:true,showPerson:false});
   }
 
@@ -1074,6 +1074,9 @@
       renderOwnerStaffPreviewDetail();
       document.querySelectorAll('#ownerStaffPreviewTable tbody tr').forEach(tr=>tr.classList.remove('owner-preview-selected'));
       btn.closest('tr')?.classList.add('owner-preview-selected');
+      setTimeout(()=>{
+        $('ownerStaffPreviewDetail')?.scrollIntoView({behavior:'smooth',block:'start'});
+      },30);
     });
     $('refreshOwnerPreviewBtn')?.addEventListener('click',loadOwnerStaffPreview);
     $('managerAckList')?.addEventListener('click', e=>{

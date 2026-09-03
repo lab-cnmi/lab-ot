@@ -929,3 +929,33 @@ td{line-height:1.45}
   .ack-review-card{padding:15px}
   .ack-verify-metrics>div{min-width:95px}
 }
+
+
+/* V2.21 — owner preview selected OT at top */
+.owner-preview-detail-top{
+  margin-top:0;
+  padding-top:0;
+  border-top:0;
+  scroll-margin-top:150px;
+}
+.owner-preview-detail-top>h3{
+  font-size:19px;
+  margin-bottom:14px;
+}
+.owner-preview-picker{
+  margin-top:22px;
+  padding-top:18px;
+  border-top:1px solid #e4ebef;
+}
+.owner-preview-picker-head{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  margin-bottom:10px;
+}
+.owner-preview-picker-head h3{
+  margin:0;
+  font-size:16px;
+  font-weight:700;
+  color:#263b4c;
+}
