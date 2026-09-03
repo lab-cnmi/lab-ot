@@ -47,7 +47,8 @@
     managedUsers: [],
     resetUser: null,
     forcePasswordChange: false,
-    installPrompt: null
+    installPrompt: null,
+    appLogs: []
   };
 
   const $ = id => document.getElementById(id);
@@ -168,14 +169,32 @@
   }
 
   function applyViewRole(role, {persist=true}={}) {
-    state.viewRole = state.actualRole === 'admin' ? 'admin' : 'staff';
-    state.role = state.viewRole;
-    document.body.dataset.viewRole = state.viewRole;
-    const wrap=$('viewModeWrap');
-    if(wrap) wrap.hidden=true;
-    document.querySelectorAll('[data-admin-only]').forEach(el=>{el.hidden=state.role!=='admin';});
-    document.querySelectorAll('[data-staff-only]').forEach(el=>{el.hidden=state.role!=='staff';});
-    recompute();
+    const canSwitch=state.actualRole==='admin';
+    const wanted=canSwitch && role==='staff' ? 'staff' : (state.actualRole==='admin'?'admin':'staff');
+
+    state.viewRole=wanted;
+    state.role=wanted;
+    document.body.dataset.viewRole=wanted;
+
+    const email=String(state.session?.user?.email||'').toLowerCase();
+
+    if(wanted==='staff'){
+      $('ackLoginBadge').textContent=`Staff · ${email}`;
+      if($('ackRoleSwitchWrap')) $('ackRoleSwitchWrap').hidden=!canSwitch;
+      if($('ackRoleSwitch')) $('ackRoleSwitch').value='staff';
+      showOnly('ackView');
+      switchStaffTab('myack');
+      loadAckPortal();
+    }else{
+      $('loginBadge').textContent=`Admin · ${email}`;
+      if($('adminRoleSwitchWrap')) $('adminRoleSwitchWrap').hidden=!canSwitch;
+      if($('adminRoleSwitch')) $('adminRoleSwitch').value='admin';
+      showOnly('appView');
+      document.querySelectorAll('[data-admin-only]').forEach(el=>{el.hidden=false;});
+      switchTab('work');
+    }
+
+    if(persist && canSwitch) sessionStorage.setItem('labot_view_role',wanted);
   }
 
   function toggleViewModeMenu() {
@@ -230,9 +249,6 @@
       };
 
       if (role === 'admin') {
-        $('loginBadge').textContent = `Admin · ${email}`;
-        showOnly('appView');
-        applyViewRole('admin', {persist:false});
         await Promise.all([
           loadHistory(),
           loadSpecial328Settings(),
@@ -240,12 +256,13 @@
           loadManagerOwnAck(),
           loadManagedUsers()
         ]);
+        const savedView=sessionStorage.getItem('labot_view_role');
+        applyViewRole(savedView==='staff'?'staff':'admin',{persist:false});
       } else {
-        $('ackLoginBadge').textContent = `${state.ackPerson?.display_name || email} · ${email}`;
-        showOnly('ackView');
-        await loadAckPortal();
+        applyViewRole('staff',{persist:false});
       }
 
+      await writeAppLog('login','เข้าสู่ระบบ','');
       maybeForcePasswordChange();
     } catch (err) {
       console.error('session role lookup failed', err);
@@ -259,7 +276,7 @@
   function enterOffline() {
     state.offline = true; state.role = 'staff'; state.actualRole = 'demo'; state.viewRole = 'staff'; state.session = { user:{ email:'โหมดทดสอบ' } };
     $('loginBadge').textContent = 'โหมดทดสอบ · ไม่บันทึกฐานข้อมูล';
-    showOnly('appView'); applyViewRole('staff', {persist:false}); recompute();
+    applyViewRole('staff', {persist:false}); recompute();
   }
 
   async function login(e) {
@@ -366,6 +383,7 @@
       if(modal) modal.hidden=true;
       if(form) form.reset();
       toast('เปลี่ยนรหัสผ่านเรียบร้อยแล้ว');
+      await writeAppLog('password_change','เปลี่ยนรหัสผ่าน','');
     } catch (err) {
       console.error('change password failed', err);
       showError(err?.message || 'เปลี่ยนรหัสผ่านไม่สำเร็จ กรุณาลองใหม่');
@@ -375,10 +393,99 @@
   }
 
   async function logout() {
-    if (state.sb && !state.offline) await state.sb.auth.signOut();
+    if (state.sb && !state.offline) {
+      await writeAppLog('logout','ออกจากระบบ','');
+      await state.sb.auth.signOut();
+    }
     location.reload();
   }
 
+
+
+  /* ===========================
+     APP ACTIVITY LOG
+     =========================== */
+  async function writeAppLog(action,label,detail='',targetEmail='',cycleKey='') {
+    if(state.offline || !state.sb || !state.session?.user?.email) return;
+    try{
+      const {error}=await state.sb.rpc('log_ot_app_event',{
+        p_action:String(action||''),
+        p_label:String(label||''),
+        p_detail:String(detail||''),
+        p_target_email:String(targetEmail||''),
+        p_cycle_key:String(cycleKey||'')
+      });
+      if(error) console.warn('app log',error);
+    }catch(err){
+      console.warn('app log',err);
+    }
+  }
+
+  function renderAppLogs(rows,table,empty,isAdmin=false) {
+    if(!table||!empty) return;
+    const data=Array.isArray(rows)?rows:[];
+    if(!data.length){
+      empty.hidden=false;
+      empty.textContent='ยังไม่มีรายการ';
+      table.innerHTML='';
+      return;
+    }
+    empty.hidden=true;
+
+    if(isAdmin){
+      table.innerHTML=`<thead><tr>
+        <th>วันเวลา</th><th>ผู้ใช้งาน</th><th>Role</th><th>รายการ</th><th>รายละเอียด</th>
+      </tr></thead><tbody>${data.map(r=>`<tr>
+        <td class="log-time">${esc(fmtDateTimeThai(r.created_at))}</td>
+        <td><b>${esc(r.actor_name||String(r.actor_email||'').replace(/@mahidol\.ac\.th$/i,''))}</b><div class="subtle">${esc(r.actor_email||'')}</div></td>
+        <td>${esc(String(r.actor_role||'').toLowerCase()==='admin'?'Admin':'Staff')}</td>
+        <td><b>${esc(r.action_label||'-')}</b></td>
+        <td>${esc(r.detail||'-')}</td>
+      </tr>`).join('')}</tbody>`;
+    }else{
+      table.innerHTML=`<thead><tr>
+        <th>วันเวลา</th><th>รายการ</th><th>รายละเอียด</th>
+      </tr></thead><tbody>${data.map(r=>`<tr>
+        <td class="log-time">${esc(fmtDateTimeThai(r.created_at))}</td>
+        <td><b>${esc(r.action_label||'-')}</b></td>
+        <td>${esc(r.detail||'-')}</td>
+      </tr>`).join('')}</tbody>`;
+    }
+  }
+
+  async function loadAppLogs(scope='staff') {
+    if(state.offline || !state.sb) return;
+    const adminMode=scope==='admin';
+    const table=adminMode?$('adminLogTable'):$('staffLogTable');
+    const empty=adminMode?$('adminLogEmpty'):$('staffLogEmpty');
+    if(!table||!empty) return;
+
+    empty.hidden=false;
+    empty.textContent='กำลังโหลด…';
+    table.innerHTML='';
+
+    try{
+      const {data,error}=await state.sb.rpc('get_ot_app_logs',{
+        p_scope:adminMode?'admin':'self',
+        p_limit:100
+      });
+      if(error) throw error;
+      state.appLogs=data||[];
+      renderAppLogs(state.appLogs,table,empty,adminMode);
+    }catch(err){
+      console.warn('load app logs',err);
+      empty.hidden=false;
+      empty.textContent='ยังเปิด Log ไม่ได้';
+      table.innerHTML='';
+    }
+  }
+
+  function switchStaffTab(name) {
+    document.querySelectorAll('.staff-tab').forEach(x=>x.classList.toggle('active',x.dataset.staffTab===name));
+    document.querySelectorAll('.staff-tab-panel').forEach(x=>x.classList.toggle('active',x.id===`staff-tab-${name}`));
+    if(name==='myack') loadAckPortal();
+    if(name==='log') loadAppLogs('staff');
+  }
 
   /* ===========================
      PWA INSTALL
@@ -643,7 +750,14 @@
     try{
       await invokeAdminUsers('update',{userId,displayName,position,role,active});
       toast('บันทึกผู้ใช้งานแล้ว');
+      const ownEmail=String(state.session?.user?.email||'').toLowerCase();
+      const targetEmail=String(user.email||'').toLowerCase();
       await Promise.all([loadManagedUsers(),loadAckManagerData()]);
+      if(targetEmail===ownEmail){
+        if(!active) return logout();
+        state.actualRole=role==='admin'?'admin':'staff';
+        applyViewRole(state.actualRole,{persist:false});
+      }
     }catch(err){
       console.error('save managed user',err);
       toast(err?.message||'บันทึกผู้ใช้งานไม่สำเร็จ');
@@ -698,6 +812,11 @@
     $('loginForm').addEventListener('submit', login);
     $('installAppBtn')?.addEventListener('click', installApp);
     $('ackInstallAppBtn')?.addEventListener('click', installApp);
+    $('adminRoleSwitch')?.addEventListener('change',e=>applyViewRole(e.target.value));
+    $('ackRoleSwitch')?.addEventListener('change',e=>applyViewRole(e.target.value));
+    document.querySelectorAll('.staff-tab').forEach(btn=>btn.addEventListener('click',()=>switchStaffTab(btn.dataset.staffTab)));
+    $('refreshAdminLogBtn')?.addEventListener('click',()=>loadAppLogs('admin'));
+    $('refreshStaffLogBtn')?.addEventListener('click',()=>loadAppLogs('staff'));
     $('ackLogoutBtn')?.addEventListener('click', logout);
     $('ackChangePasswordBtn')?.addEventListener('click', openPasswordModal);
     $('saveAckEmailsBtn')?.addEventListener('click', saveAckMappings);
@@ -789,6 +908,7 @@
     if (name === 'history') loadHistory();
     if (name === 'users') loadManagedUsers();
     if (name === 'myack') loadManagerOwnAck();
+    if (name === 'log') loadAppLogs('admin');
   }
 
   function setUnitStatus(unit, text, cls='') {
@@ -1126,6 +1246,7 @@
       $('calendarSyncMeta').hidden=false;
       $('calendarSyncMeta').innerHTML=`<b>อัปเดต:</b> ${esc(fmtDateTimeThai(state.calendarSyncedAt))}`;
       recompute(); toast('ดึงวันลาล่าสุดแล้ว');
+      await writeAppLog('calendar_sync','ดึงวันลา',`${state.leaveEvents.length} รายการ`,'',currentCycleKey());
     } catch (err) {
       console.error(err); $('calendarStatus').className='file-status error'; $('calendarStatus').textContent=`ดึงวันลาไม่สำเร็จ: ${err.message || err}`; toast('ดึงวันลาไม่สำเร็จ');
     } finally { $('syncCalendarBtn').disabled = state.offline || !unitsReady(); }
@@ -1442,7 +1563,8 @@
       const {data,error}=await state.sb.rpc('acknowledge_ot',{p_cycle_key:cycleKey});
       if(error) throw error;
       toast('บันทึกรับทราบเรียบร้อยแล้ว');
-      if(state.actualRole==='ack') await loadAckPortal();
+      await writeAppLog('ack_ot','รับทราบ OT',`รอบ ${cycleKey}`,'',cycleKey);
+      if(state.viewRole==='staff') await loadAckPortal();
       else await Promise.all([loadManagerOwnAck(),loadAckManagerData()]);
     }catch(err){
       console.error('acknowledge OT',err);
@@ -1565,6 +1687,7 @@
       ? `บันทึกช่วงสิทธิ์ 00000328 จำนวน ${state.special328Dates.length} วันแล้ว`
       : 'บันทึกแล้ว: รอบนี้ไม่มีสิทธิ์ 00000328');
     renderSpecial328Eligibility();
+    await writeAppLog('special328_save','บันทึกวันที่ 00000328',state.special328Dates.length?state.special328Dates.map(fmtThaiDate).join(', '):'ไม่มีวันที่','',currentCycleKey());
   }
 
   function buildSpecial328Eligibility(assignments=allAssignments()) {
@@ -2132,6 +2255,7 @@
       XLSX.writeFile(wb,fileName);
       const carry=hrRound2(totals.reduce((s,t)=>s+t.carry,0));
       toast(`Export HR สำเร็จ • OT ปกติ MT 130 จำนวน ${allocation.rows.length} เวร × 8 ชม. • 00000328 ${special328.rows.length} ครั้ง = ${(special328.rows.length*HR_SPECIAL_328.amountPer8h).toLocaleString('th-TH')} บาท • ทบเดือนหน้า ${carry} ชม.`);
+      await writeAppLog('export_hr','Export HR Excel',`${allocation.rows.length} ช่วง OT · 00000328 ${special328.rows.length} ครั้ง`,'',currentCycleKey());
     } catch(err) {
       console.error('HR export failed',err);toast(`Export HR ไม่สำเร็จ: ${err.message||err}`);
     } finally {
@@ -2166,7 +2290,9 @@
       } catch (ackErr) {
         console.warn('prepare acknowledgements failed', ackErr);
       }
-      toast('บันทึกรอบนี้แล้ว'); await loadHistory();
+      toast('บันทึกรอบนี้แล้ว');
+      await writeAppLog('cycle_save','บันทึกรอบ OT',fmtThaiRange(state.cycle.start,state.cycle.end),'',cycleKey);
+      await loadHistory();
     } catch(err) { console.error(err); toast(`บันทึกไม่สำเร็จ: ${err.message || err}`); }
     finally { recompute(); }
   }
@@ -2187,7 +2313,9 @@
     if (!confirm('ยืนยันลบรอบนี้ออกจากฐานข้อมูล?')) return;
     const { error } = await state.sb.from('ot_batches').delete().eq('cycle_key',cycleKey);
     if (error) return toast(`ลบไม่สำเร็จ: ${error.message}`);
-    toast('ลบรอบแล้ว'); await loadHistory();
+    toast('ลบรอบแล้ว');
+    await writeAppLog('cycle_delete','ลบรอบ OT',cycleKey,'',cycleKey);
+    await loadHistory();
   }
 
   async function loadSavedCycle(cycleKey) {

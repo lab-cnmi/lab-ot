@@ -7,13 +7,13 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="default" />
   <meta name="apple-mobile-web-app-title" content="LAB OT" />
-  <link rel="manifest" href="manifest.webmanifest?v=20260903-2" />
+  <link rel="manifest" href="manifest.webmanifest?v=20260903-3" />
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
   <title>LAB OT — LAB / Molec / Bacteria</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=20260903-v216" />
+  <link rel="stylesheet" href="styles.css?v=20260903-v217" />
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3EOT%3C/text%3E%3C/svg%3E">
   <style>
     /* Critical: author CSS (.center-shell { display:grid }) must not override HTML hidden state */
@@ -62,6 +62,13 @@
       </div>
       <div class="topbar-actions">
         <span id="loginBadge" class="user-badge"></span>
+        <label id="adminRoleSwitchWrap" class="role-switch">
+          <span class="sr-only">Role</span>
+          <select id="adminRoleSwitch" aria-label="Role">
+            <option value="admin">Admin</option>
+            <option value="staff">Staff</option>
+          </select>
+        </label>
         <button id="changePasswordBtn" class="ghost-btn">เปลี่ยนรหัสผ่าน</button>
         <button id="logoutBtn" class="ghost-btn">ออกจากระบบ</button>
       </div>
@@ -72,6 +79,7 @@
       <button class="tab" data-tab="history">รอบที่บันทึกไว้</button>
       <button class="tab" data-tab="myack">OT ของฉัน</button>
       <button class="tab" data-tab="users" data-admin-only>ผู้ใช้งาน</button>
+      <button class="tab" data-tab="log">Log ล่าสุดของแอพ</button>
       <button class="tab" data-tab="guide">วิธีใช้</button>
     </nav>
     <main class="page-shell">
@@ -296,6 +304,20 @@
         </section>
       </section>
 
+      <section id="tab-log" class="tab-panel">
+        <section class="card">
+          <div class="section-head">
+            <div>
+              <h2>Log ล่าสุดของแอพ</h2>
+              <p>แสดงกิจกรรมของผู้ใช้งานในระบบ โดยไม่แสดงกิจกรรมของ parichat.ink</p>
+            </div>
+            <button id="refreshAdminLogBtn" class="secondary-btn" type="button">รีเฟรช</button>
+          </div>
+          <div id="adminLogEmpty" class="empty-state">กำลังโหลด…</div>
+          <div class="table-wrap"><table id="adminLogTable"></table></div>
+        </section>
+      </section>
+
       <section id="tab-guide" class="tab-panel">
         <section class="guide-card simple-guide">
           <h2>วิธีใช้</h2>
@@ -309,6 +331,7 @@
             <li><b>ตรวจสรุป OT</b><span>เช็กชื่อ ชั่วโมง และรายการเตือนให้เรียบร้อย</span></li>
             <li><b>บันทึกรอบ</b><span>เมื่อข้อมูลถูกต้องแล้ว กด “ยืนยันและบันทึกรอบนี้”</span></li>
             <li><b>ติดตามการรับทราบ</b><span>ดูหัวข้อ “รับทราบ OT” ว่าใครรับทราบแล้วและใครยังค้างอยู่</span></li>
+            <li><b>ดู Log ล่าสุดของแอพ</b><span>ใช้ตรวจการเข้าใช้ การรับทราบ และการทำรายการของผู้ใช้งานในระบบ</span></li>
             <li><b>Export</b><span>Export HR Excel และ Export หลักฐานการรับทราบเมื่อพร้อมส่งงาน</span></li>
           </ol>
 
@@ -345,21 +368,65 @@
     <header class="topbar ack-topbar">
       <div>
         <div class="eyebrow">LAB OT</div>
-        <h1>รับทราบ OT</h1>
+        <h1>OT ของฉัน</h1>
       </div>
       <div class="topbar-actions">
         <span id="ackLoginBadge" class="user-badge"></span>
+        <label id="ackRoleSwitchWrap" class="role-switch" hidden>
+          <span class="sr-only">Role</span>
+          <select id="ackRoleSwitch" aria-label="Role">
+            <option value="admin">Admin</option>
+            <option value="staff" selected>Staff</option>
+          </select>
+        </label>
         <button id="ackInstallAppBtn" class="ghost-btn" type="button" hidden>ติดตั้งแอป</button>
         <button id="ackChangePasswordBtn" class="ghost-btn" type="button">เปลี่ยนรหัสผ่าน</button>
         <button id="ackLogoutBtn" class="ghost-btn" type="button">ออกจากระบบ</button>
       </div>
     </header>
-    <main class="ack-page-shell">
-      <div id="ackEmpty" class="empty-state">กำลังโหลดรายการ…</div>
-      <section id="ackList" class="ack-list"></section>
+
+    <nav class="tabs staff-tabs" aria-label="เมนูเจ้าหน้าที่">
+      <button class="tab staff-tab active" data-staff-tab="myack">OT ของฉัน</button>
+      <button class="tab staff-tab" data-staff-tab="guide">วิธีใช้</button>
+      <button class="tab staff-tab" data-staff-tab="log">Log ล่าสุดของแอพ</button>
+    </nav>
+
+    <main class="ack-page-shell staff-page-shell">
+      <section id="staff-tab-myack" class="staff-tab-panel active">
+        <div id="ackEmpty" class="empty-state">กำลังโหลดรายการ…</div>
+        <section id="ackList" class="ack-list"></section>
+      </section>
+
+      <section id="staff-tab-guide" class="staff-tab-panel">
+        <section class="guide-card simple-guide staff-guide">
+          <h2>วิธีใช้</h2>
+          <ol class="guide-steps">
+            <li><b>เปิด “OT ของฉัน”</b><span>เลือกดูรอบ OT และเปิดรายละเอียดเวรของตนเอง</span></li>
+            <li><b>ตรวจรายการ</b><span>เช็กวันที่ หน่วย เวร เวลา และจำนวนชั่วโมงให้ถูกต้อง</span></li>
+            <li><b>กดยืนยันรับทราบ</b><span>ติ๊กข้อความรับทราบ แล้วกด “ยืนยันรับทราบ”</span></li>
+            <li><b>ถ้าข้อมูลถูกแก้ภายหลัง</b><span>ระบบจะให้รับทราบใหม่เฉพาะรอบที่ข้อมูลของคุณเปลี่ยน</span></li>
+            <li><b>เปลี่ยนรหัสผ่าน</b><span>กดปุ่ม “เปลี่ยนรหัสผ่าน” ด้านบนได้ตลอด</span></li>
+          </ol>
+          <h3>ติดตั้งบนมือถือ</h3>
+          <div class="mobile-guide-grid">
+            <div><b>Android</b><span>เปิดด้วย Chrome → เลือก “ติดตั้งแอป” หรือ “เพิ่มไปยังหน้าจอหลัก”</span></div>
+            <div><b>iPhone / iPad</b><span>เปิดด้วย Safari → กด Share → “เพิ่มไปยังหน้าจอโฮม”</span></div>
+          </div>
+        </section>
+      </section>
+
+      <section id="staff-tab-log" class="staff-tab-panel">
+        <section class="card">
+          <div class="section-head">
+            <div><h2>Log ล่าสุดของแอพ</h2></div>
+            <button id="refreshStaffLogBtn" class="secondary-btn" type="button">รีเฟรช</button>
+          </div>
+          <div id="staffLogEmpty" class="empty-state">กำลังโหลด…</div>
+          <div class="table-wrap"><table id="staffLogTable"></table></div>
+        </section>
+      </section>
     </main>
   </main>
-
 
   <div id="adminResetPasswordModal" class="modal-backdrop" hidden>
     <section class="modal-card password-modal" role="dialog" aria-modal="true" aria-labelledby="adminResetPasswordTitle">
@@ -429,7 +496,7 @@
     };
     window.PSC_OT_CONFIG = window.LAB_OT_CONFIG;
   </script>
-  <script src="app.js?v=20260903-18"></script>
+  <script src="app.js?v=20260903-19"></script>
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(console.warn));

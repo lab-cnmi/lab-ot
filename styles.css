@@ -641,3 +641,48 @@ td{line-height:1.45}
   .new-user-grid{grid-template-columns:1fr}
   .user-actions{flex-wrap:wrap}
 }
+
+
+/* V2.17 — exact Staff shell + app activity log */
+.role-switch{
+  display:inline-flex;
+  align-items:center;
+}
+.role-switch select{
+  min-width:94px;
+  height:44px;
+  border:1px solid #d8e3ea;
+  border-radius:12px;
+  background:#fff;
+  color:#315b72;
+  padding:0 32px 0 13px;
+  font-family:inherit;
+  font-size:14px;
+  font-weight:600;
+}
+.sr-only{
+  position:absolute!important;
+  width:1px!important;
+  height:1px!important;
+  padding:0!important;
+  margin:-1px!important;
+  overflow:hidden!important;
+  clip:rect(0,0,0,0)!important;
+  white-space:nowrap!important;
+  border:0!important;
+}
+.staff-tab-panel{display:none}
+.staff-tab-panel.active{display:block}
+.staff-page-shell{margin-top:24px}
+.staff-guide{max-width:none}
+.log-time{white-space:nowrap}
+#adminLogTable td,#staffLogTable td{vertical-align:top}
+#adminLogTable th:nth-child(1){min-width:145px}
+#adminLogTable th:nth-child(2){min-width:190px}
+#adminLogTable th:nth-child(4){min-width:150px}
+#staffLogTable th:nth-child(1){min-width:145px}
+#staffLogTable th:nth-child(2){min-width:170px}
+@media(max-width:760px){
+  .role-switch select{height:40px;min-width:82px}
+  .staff-tabs{overflow-x:auto;white-space:nowrap}
+}
