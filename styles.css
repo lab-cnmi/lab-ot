@@ -1322,3 +1322,36 @@ td{line-height:1.45}
   font-weight:400 !important;
   box-sizing:border-box !important;
 }
+
+
+/* V2.31 — Active checkbox ขนาดปกติ */
+.new-user-grid .create-active-toggle{
+  width:100% !important;
+  height:46px !important;
+  min-height:46px !important;
+  display:flex !important;
+  align-items:center !important;
+  justify-content:flex-start !important;
+  gap:9px !important;
+  padding:0 12px !important;
+  box-sizing:border-box !important;
+}
+
+.new-user-grid .create-active-toggle input[type="checkbox"],
+#newUserActive{
+  width:18px !important;
+  height:18px !important;
+  min-width:18px !important;
+  min-height:18px !important;
+  max-width:18px !important;
+  max-height:18px !important;
+  flex:0 0 18px !important;
+  margin:0 !important;
+  padding:0 !important;
+  accent-color:auto;
+}
+
+.new-user-grid .create-active-toggle > span{
+  flex:0 0 auto !important;
+  width:auto !important;
+}
