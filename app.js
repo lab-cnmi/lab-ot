@@ -89,8 +89,15 @@
     return { start: iso(y,m,16), end: iso(ey,em,15), startYear:y, startMonth:m };
   }
 
+  // หน้าใช้งานเรียกรอบตาม "เดือนที่สิ้นสุดรอบ" เช่น รอบ ก.ย. = 16 ส.ค.–15 ก.ย.
+  function cycleFromRoundMonth(y, m) {
+    let sy = y, sm = m - 1;
+    if (sm === 0) { sm = 12; sy -= 1; }
+    return cycleFromStartMonth(sy, sm);
+  }
+
   function setCycleControls(cycle) {
-    const d = parseIso(cycle.start);
+    const d = parseIso(cycle.end);
     $('cycleMonth').value = String(d.getMonth()+1);
     $('cycleYear').value = String(d.getFullYear()+543);
     updateCycleTitle();
@@ -99,7 +106,7 @@
   function readCycleControls() {
     const m = Number($('cycleMonth').value), be = Number($('cycleYear').value);
     if (!m || !be) return getCurrentCycle();
-    return cycleFromStartMonth(buddhistToAd(be), m);
+    return cycleFromRoundMonth(buddhistToAd(be), m);
   }
 
   function updateCycleTitle() {
@@ -265,7 +272,7 @@
     $('offlineDemoBtn').addEventListener('click', enterOffline);
     $('cycleMonth').addEventListener('change', onCycleChange);
     $('cycleYear').addEventListener('change', onCycleChange);
-    $('currentCycleBtn').addEventListener('click', () => { const c=getCurrentCycle(); const d=parseIso(c.start); $('cycleMonth').value=String(d.getMonth()+1); $('cycleYear').value=String(d.getFullYear()+543); onCycleChange(); });
+    $('currentCycleBtn').addEventListener('click', () => { const c=getCurrentCycle(); const d=parseIso(c.end); $('cycleMonth').value=String(d.getMonth()+1); $('cycleYear').value=String(d.getFullYear()+543); onCycleChange(); });
     $('labFile').addEventListener('change', e => onUnitFile('LAB', e.target.files?.[0]));
     $('molecFile').addEventListener('change', e => onUnitFile('Molec', e.target.files?.[0]));
     $('bacteriaFile').addEventListener('change', e => onUnitFile('Bacteria', e.target.files?.[0]));
