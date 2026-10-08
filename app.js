@@ -1061,7 +1061,6 @@
     try{
       const data=await invokeAdminUsers('list');
       state.managedUsers=Array.isArray(data?.users)?data.users:[];
-      renderFileStaffAudit();
       renderLabExtraStaffPicker();
       if(!state.managedUsers.length){
         empty.textContent='ยังไม่มีบัญชีผู้ใช้งาน';
@@ -1422,8 +1421,6 @@
     });
 
     document.querySelectorAll('.tab').forEach(btn => btn.addEventListener('click', () => switchTab(btn.dataset.tab)));
-    $('refreshFileStaffAuditBtn')?.addEventListener('click',()=>{ renderFileStaffAudit(); toast('รีเฟรชรายชื่อในไฟล์แล้ว'); });
-    $('fileStaffReviewOnly')?.addEventListener('change',renderFileStaffAudit);
     $('historyList').addEventListener('click', e => {
       const load = e.target.closest('[data-load-cycle]'); if (load) return loadSavedCycle(load.dataset.loadCycle);
       const del = e.target.closest('[data-delete-cycle]'); if (del) return deleteSavedCycle(del.dataset.deleteCycle);
@@ -1434,7 +1431,6 @@
     document.querySelectorAll('.tab').forEach(x => x.classList.toggle('active', x.dataset.tab === name));
     document.querySelectorAll('.tab-panel').forEach(x => x.classList.toggle('active', x.id === `tab-${name}`));
     if (name === 'history') loadHistory();
-    if (name === 'file-staff') { loadManagedUsers().finally(renderFileStaffAudit); }
     if (name === 'users') loadManagedUsers();
     if (name === 'myack') { loadManagerOwnAck(); if(canAdminPreviewAllStaff()) loadOwnerStaffPreview(); }
     if (name === 'log') loadAppLogs('admin');
@@ -1460,7 +1456,6 @@
       setUnitStatus(unit, `✓ ${file.name} · ${parsed.assignments.length} รายการ · ${parsed.totalHours} ชม.${warnCount ? ` · มี ${warnCount} จุดให้ตรวจ` : ''}`, warnCount ? 'warn' : 'ok');
       $('calendarSyncMeta').hidden = true;
       recompute();
-    renderFileStaffAudit();
     } catch (err) {
       console.error(err); state.units[unit] = null; state.rawFiles[unit] = null;
       setUnitStatus(unit, `อ่านไฟล์ไม่ได้: ${err.message}`, 'error'); recompute();
@@ -2569,7 +2564,7 @@
     return {matched,unresolved,total:parts.length};
   }
 
-  // V2.46: the helper picker and the file-staff audit use the SAME current-cycle file assignments.
+  // V2.47: the helper picker uses current-cycle file assignments; the separate file-staff tab was removed from the UI.
   // Account creation is not required for OT eligibility; explicitly inactive accounts are excluded.
   function labExtraPickerRows() {
     const inactiveCodes=new Set((state.managedUsers||[])
