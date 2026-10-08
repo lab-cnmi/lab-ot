@@ -930,6 +930,93 @@
   }
 
   /* ===========================
+     FILE STAFF AUDIT — ADMIN V2.45
+     =========================== */
+  function collectFileStaffAuditRows() {
+    const byKey=new Map();
+    for(const unit of UNITS){
+      for(const a of (state.units[unit]?.assignments||[])){
+        const rawName=String(a?.name||'').trim();
+        if(!rawName) continue;
+        const staff=hrStaff(rawName);
+        const code=staff?.employeeCode||'';
+        const key=code ? `code:${code}` : `name:${normName(rawName)}`;
+        if(!byKey.has(key)) byKey.set(key,{
+          key,
+          rawName,
+          displayName:staff?.fullName||rawName,
+          employeeCode:code,
+          units:new Set(),
+          count:0,
+          inMaster:!!staff
+        });
+        const row=byKey.get(key);
+        row.units.add(unit);
+        row.count++;
+      }
+    }
+    const usersByCode=new Map((state.managedUsers||[])
+      .filter(u=>u.employeeCode)
+      .map(u=>[String(u.employeeCode).replace(/\D/g,'').padStart(7,'0'),u]));
+    return [...byKey.values()].map(row=>{
+      const user=row.employeeCode?usersByCode.get(row.employeeCode):null;
+      let status='review',statusLabel='ต้องตรวจสอบ',detail='';
+      if(!row.inMaster){
+        detail='ไม่พบชื่อนี้ใน Master บุคลากร';
+      } else if(user?.active===false){
+        status='inactive'; statusLabel='ควรนำออก'; detail='บัญชีถูกปิด Active แล้ว';
+      } else if(user?.active!==false && user){
+        status='active'; statusLabel='Active'; detail='บัญชีใช้งานอยู่';
+      } else {
+        detail='พบใน Master แต่ยังไม่มีบัญชีผู้ใช้งาน';
+      }
+      return {...row, user, status, statusLabel, detail, unitText:[...row.units].join(', ')};
+    }).sort((a,b)=>{
+      const order={inactive:0,review:1,active:2};
+      return (order[a.status]-order[b.status]) || a.displayName.localeCompare(b.displayName,'th');
+    });
+  }
+
+  function renderFileStaffAudit() {
+    const table=$('fileStaffAuditTable'), empty=$('fileStaffAuditEmpty');
+    if(!table||!empty) return;
+    const rows=collectFileStaffAuditRows();
+    const reviewOnly=!!$('fileStaffReviewOnly')?.checked;
+    const shown=reviewOnly?rows.filter(x=>x.status!=='active'):rows;
+    const active=rows.filter(x=>x.status==='active').length;
+    const inactive=rows.filter(x=>x.status==='inactive').length;
+    const review=rows.filter(x=>x.status==='review').length;
+    if($('fileStaffTotal')) $('fileStaffTotal').textContent=String(rows.length);
+    if($('fileStaffActive')) $('fileStaffActive').textContent=String(active);
+    if($('fileStaffInactive')) $('fileStaffInactive').textContent=String(inactive);
+    if($('fileStaffReview')) $('fileStaffReview').textContent=String(review);
+
+    if(!rows.length){
+      empty.hidden=false;
+      empty.textContent='ยังไม่ได้อัปโหลดไฟล์รอบนี้';
+      table.innerHTML='';
+      return;
+    }
+    if(!shown.length){
+      empty.hidden=false;
+      empty.textContent='ไม่มีรายชื่อที่ต้องนำออกหรือตรวจสอบ';
+      table.innerHTML='';
+      return;
+    }
+    empty.hidden=true;
+    table.innerHTML=`<thead><tr>
+      <th>ชื่อในไฟล์</th><th>รหัสพนักงาน</th><th>พบในหน่วย</th><th>จำนวนรายการ</th><th>สถานะ</th><th>เหตุผล</th>
+    </tr></thead><tbody>${shown.map(r=>`<tr class="file-staff-row file-staff-${r.status}">
+      <td><b>${esc(r.displayName)}</b>${r.displayName!==r.rawName?`<div class="subtle">ในไฟล์: ${esc(r.rawName)}</div>`:''}</td>
+      <td>${esc(r.employeeCode||'-')}</td>
+      <td>${esc(r.unitText||'-')}</td>
+      <td>${r.count}</td>
+      <td><span class="pill ${r.status==='active'?'good':r.status==='inactive'?'warning':''}">${esc(r.statusLabel)}</span></td>
+      <td>${esc(r.detail)}</td>
+    </tr>`).join('')}</tbody>`;
+  }
+
+  /* ===========================
      USER MANAGEMENT — ADMIN
      =========================== */
   function normalizeEmployeeCode(value) {
@@ -974,6 +1061,8 @@
     try{
       const data=await invokeAdminUsers('list');
       state.managedUsers=Array.isArray(data?.users)?data.users:[];
+      renderFileStaffAudit();
+      renderLabExtraStaffPicker();
       if(!state.managedUsers.length){
         empty.textContent='ยังไม่มีบัญชีผู้ใช้งาน';
         return;
@@ -1333,6 +1422,8 @@
     });
 
     document.querySelectorAll('.tab').forEach(btn => btn.addEventListener('click', () => switchTab(btn.dataset.tab)));
+    $('refreshFileStaffAuditBtn')?.addEventListener('click',()=>{ renderFileStaffAudit(); toast('รีเฟรชรายชื่อในไฟล์แล้ว'); });
+    $('fileStaffReviewOnly')?.addEventListener('change',renderFileStaffAudit);
     $('historyList').addEventListener('click', e => {
       const load = e.target.closest('[data-load-cycle]'); if (load) return loadSavedCycle(load.dataset.loadCycle);
       const del = e.target.closest('[data-delete-cycle]'); if (del) return deleteSavedCycle(del.dataset.deleteCycle);
@@ -1343,6 +1434,7 @@
     document.querySelectorAll('.tab').forEach(x => x.classList.toggle('active', x.dataset.tab === name));
     document.querySelectorAll('.tab-panel').forEach(x => x.classList.toggle('active', x.id === `tab-${name}`));
     if (name === 'history') loadHistory();
+    if (name === 'file-staff') { loadManagedUsers().finally(renderFileStaffAudit); }
     if (name === 'users') loadManagedUsers();
     if (name === 'myack') { loadManagerOwnAck(); if(canAdminPreviewAllStaff()) loadOwnerStaffPreview(); }
     if (name === 'log') loadAppLogs('admin');
@@ -1368,6 +1460,7 @@
       setUnitStatus(unit, `✓ ${file.name} · ${parsed.assignments.length} รายการ · ${parsed.totalHours} ชม.${warnCount ? ` · มี ${warnCount} จุดให้ตรวจ` : ''}`, warnCount ? 'warn' : 'ok');
       $('calendarSyncMeta').hidden = true;
       recompute();
+    renderFileStaffAudit();
     } catch (err) {
       console.error(err); state.units[unit] = null; state.rawFiles[unit] = null;
       setUnitStatus(unit, `อ่านไฟล์ไม่ได้: ${err.message}`, 'error'); recompute();
@@ -2477,12 +2570,16 @@
   }
 
   function labExtraPickerRows() {
+    const inactiveCodes=new Set((state.managedUsers||[])
+      .filter(u=>u.active===false && u.employeeCode)
+      .map(u=>String(u.employeeCode).replace(/\D/g,'').padStart(7,'0')));
     return Object.entries(HR_STAFF_MASTER)
       .map(([nick,info])=>({
         nick,
         fullName:staffDisplayNameByCode(info.fullName,String(info.employeeCode)),
         employeeCode:String(info.employeeCode).replace(/\D/g,'').padStart(7,'0')
       }))
+      .filter(x=>!inactiveCodes.has(x.employeeCode))
       .sort((a,b)=>a.fullName.localeCompare(b.fullName,'th')||a.employeeCode.localeCompare(b.employeeCode));
   }
 

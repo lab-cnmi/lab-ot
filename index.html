@@ -13,7 +13,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=20261008-v244" />
+  <link rel="stylesheet" href="styles.css?v=20261008-v245" />
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3EOT%3C/text%3E%3C/svg%3E">
   <style>
     /* Critical: author CSS (.center-shell { display:grid }) must not override HTML hidden state */
@@ -78,6 +78,7 @@
       <button class="tab active" data-tab="work">ทำ OT รอบนี้</button>
       <button class="tab" data-tab="history">รอบที่บันทึกไว้</button>
       <button class="tab" data-tab="myack">OT ของฉัน</button>
+      <button class="tab" data-tab="file-staff" data-admin-only>รายชื่อในไฟล์</button>
       <button class="tab" data-tab="users" data-admin-only>ผู้ใช้งาน</button>
       <button class="tab" data-tab="log">Log ล่าสุดของแอพ</button>
       <button class="tab" data-tab="guide">วิธีใช้</button>
@@ -411,6 +412,30 @@
         </section>
       </section>
 
+      <section id="tab-file-staff" class="tab-panel" data-admin-only>
+        <section class="card file-staff-audit-card">
+          <div class="section-head">
+            <div>
+              <h2>รายชื่อบุคลากรที่พบในไฟล์รอบนี้</h2>
+              <p>รวมรายชื่อจากไฟล์ LAB / Molec / Bacteria ที่อัปโหลด แล้วเทียบกับสถานะบัญชีผู้ใช้งาน</p>
+            </div>
+            <button id="refreshFileStaffAuditBtn" class="secondary-btn" type="button">รีเฟรช</button>
+          </div>
+          <div class="file-staff-audit-metrics">
+            <div class="metric"><span>พบในไฟล์</span><b id="fileStaffTotal">0</b></div>
+            <div class="metric"><span>Active</span><b id="fileStaffActive">0</b></div>
+            <div class="metric warn"><span>ควรนำออก</span><b id="fileStaffInactive">0</b></div>
+            <div class="metric"><span>ต้องตรวจสอบ</span><b id="fileStaffReview">0</b></div>
+          </div>
+          <div class="file-staff-audit-toolbar">
+            <label class="file-staff-review-toggle"><input id="fileStaffReviewOnly" type="checkbox"> แสดงเฉพาะ “ควรนำออก / ต้องตรวจสอบ”</label>
+            <span class="subtle">ถ้าพนักงานลาออก ให้ไปที่เมนู “ผู้ใช้งาน” แล้วปิด Active จากนั้นชื่อจะถูกซ่อนจากตัวเลือก OT LAB ช่วยเพิ่ม</span>
+          </div>
+          <div id="fileStaffAuditEmpty" class="empty-state">ยังไม่ได้อัปโหลดไฟล์รอบนี้</div>
+          <div class="table-wrap"><table id="fileStaffAuditTable"></table></div>
+        </section>
+      </section>
+
       <section id="tab-users" class="tab-panel" data-admin-only>
         <section class="card user-admin-card">
           <div class="section-head">
@@ -665,7 +690,7 @@
     };
     window.PSC_OT_CONFIG = window.LAB_OT_CONFIG;
   </script>
-  <script src="app.js?v=20261008-44"></script>
+  <script src="app.js?v=20261008-45"></script>
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(console.warn));

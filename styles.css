@@ -1888,3 +1888,11 @@ input[type=email],input[type=password],input[type=number],input[type=date],selec
   .lab-helper-picker-tools .compact{justify-self:start}
   .lab-extra-actions{display:grid;grid-template-columns:1fr 1fr}
 }
+
+/* V2.45 — ตรวจรายชื่อบุคลากรในไฟล์ */
+.file-staff-audit-metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:12px 0}
+.file-staff-audit-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:0 0 12px}
+.file-staff-review-toggle{display:flex;grid-template-columns:auto 1fr;align-items:center;gap:8px;font-size:12px}
+.file-staff-row.file-staff-inactive td{background:#fffaf2}
+.file-staff-row.file-staff-review td{background:#fcfdfe}
+@media(max-width:760px){.file-staff-audit-metrics{grid-template-columns:repeat(2,1fr)}.file-staff-audit-toolbar{align-items:flex-start}}
