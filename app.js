@@ -2358,29 +2358,103 @@
     return out.sort((a,b)=>a.date.localeCompare(b.date)||a.slot-b.slot||a.nick.localeCompare(b.nick,'th'));
   }
 
+  function labExtraStripTitle(text) {
+    return String(text||'')
+      .replace(/^\s*(?:น\.\s*ส\.|นางสาว|นาย|นาง)\s*/i,'')
+      .replace(/\s+/g,' ')
+      .trim();
+  }
+
+  function labExtraEditDistance(a,b) {
+    a=String(a||''); b=String(b||'');
+    const m=a.length,n=b.length;
+    if(!m) return n; if(!n) return m;
+    const prev=Array.from({length:n+1},(_,i)=>i), cur=new Array(n+1);
+    for(let i=1;i<=m;i++){
+      cur[0]=i;
+      for(let j=1;j<=n;j++){
+        const cost=a[i-1]===b[j-1]?0:1;
+        cur[j]=Math.min(cur[j-1]+1,prev[j]+1,prev[j-1]+cost);
+      }
+      for(let j=0;j<=n;j++) prev[j]=cur[j];
+    }
+    return prev[n];
+  }
+
   function resolveLabExtraStaff(text) {
     const raw=String(text||'').trim();
     if(!raw) return null;
-    const n=normName(raw), s=normSearch(raw);
+
+    // รองรับการวางรหัสพนักงานมาด้วย เช่น 0017593 หรือ "อัฐฒพงษ์ 0017593"
+    const codeMatch=raw.match(/(?:^|\D)(\d{7})(?:\D|$)/);
+    if(codeMatch){
+      const code=codeMatch[1];
+      const pair=Object.entries(HR_STAFF_MASTER).find(([,x])=>String(x.employeeCode)===code);
+      if(pair) return {...hrStaff(pair[0]),labExtraMatchedBy:'code',labExtraInput:raw};
+    }
+
+    const stripped=labExtraStripTitle(raw);
+    const n=normName(stripped), s=normSearch(stripped);
+    const exact=[];
     for(const [nick,info] of Object.entries(HR_STAFF_MASTER)){
-      if(normName(nick)===n || normName(info.fullName)===n || normSearch(nick)===s || normSearch(info.fullName)===s){
-        return hrStaff(nick);
+      const full=labExtraStripTitle(info.fullName);
+      const first=full.split(/\s+/)[0]||'';
+      const candidates=[nick,full,first].map(x=>({n:normName(x),s:normSearch(x)}));
+      if(candidates.some(c=>c.n===n || c.s===s)) exact.push(nick);
+    }
+    if(exact.length===1) return {...hrStaff(exact[0]),labExtraMatchedBy:'exact',labExtraInput:raw};
+
+    // ถ้าพิมพ์คลาด 1 ตัวอักษร เช่น "อัฐพงษ์" แทน "อัฐฒพงษ์" ให้จับคู่ได้
+    const query=normName(stripped.split(/\s+/)[0]||stripped);
+    if(query.length>=4){
+      const scored=[];
+      for(const [nick,info] of Object.entries(HR_STAFF_MASTER)){
+        const full=labExtraStripTitle(info.fullName);
+        const first=normName(full.split(/\s+/)[0]||'');
+        const nickNorm=normName(nick);
+        const d=Math.min(labExtraEditDistance(query,nickNorm),labExtraEditDistance(query,first));
+        scored.push({nick,d});
+      }
+      scored.sort((a,b)=>a.d-b.d||a.nick.localeCompare(b.nick,'th'));
+      const best=scored[0], second=scored[1];
+      const maxDist=query.length>=8?2:1;
+      if(best && best.d<=maxDist && (!second || best.d<second.d)){
+        return {...hrStaff(best.nick),labExtraMatchedBy:'fuzzy',labExtraInput:raw};
       }
     }
     return null;
   }
 
+  function suggestLabExtraStaff(text) {
+    const raw=labExtraStripTitle(text);
+    const query=normName(raw.split(/\s+/)[0]||raw);
+    if(!query) return [];
+    return Object.entries(HR_STAFF_MASTER)
+      .map(([nick,info])=>{
+        const first=normName(labExtraStripTitle(info.fullName).split(/\s+/)[0]||'');
+        return {nick,fullName:info.fullName,d:Math.min(labExtraEditDistance(query,normName(nick)),labExtraEditDistance(query,first))};
+      })
+      .sort((a,b)=>a.d-b.d||a.nick.localeCompare(b.nick,'th'))
+      .slice(0,3);
+  }
+
   function parseLabExtraNames(text) {
-    const parts=String(text||'').split(/\r?\n|,|;/).map(x=>x.trim()).filter(Boolean);
-    const matched=[], unknown=[], seen=new Set();
+    const parts=String(text||'')
+      .split(/\r?\n|,|;/)
+      .map(x=>x.replace(/^\s*[\d๐-๙]+[.)-]?\s*/,'').trim())
+      .filter(Boolean);
+    const matched=[], unresolved=[], seen=new Set();
     for(const part of parts){
       const staff=resolveLabExtraStaff(part);
-      if(!staff){unknown.push(part);continue;}
+      if(!staff){
+        unresolved.push({input:part,suggestions:suggestLabExtraStaff(part)});
+        continue;
+      }
       if(seen.has(staff.employeeCode)) continue;
       seen.add(staff.employeeCode);
       matched.push(staff);
     }
-    return {matched,unknown};
+    return {matched,unresolved,total:parts.length};
   }
 
   function labRosterDutyMap(date) {
@@ -2475,28 +2549,42 @@
     const date=String($('labExtraDate')?.value||'').trim();
     const slot=Number($('labExtraSlot')?.value||8);
     const err=$('labExtraError');
-    if(err){err.hidden=true;err.textContent='';}
+    if(err){err.hidden=true;err.textContent='';err.classList.remove('lab-extra-warning');}
     const fail=msg=>{if(err){err.hidden=false;err.textContent=msg;}toast(msg);};
 
     if(!date) return fail('กรุณาเลือกวันที่');
     if(!between(date,state.cycle.start,state.cycle.end)) return fail('วันที่ต้องอยู่ในรอบ OT ที่เลือก');
-    if(!state.units.LAB) return fail('กรุณาอัปไฟล์ LAB ก่อน');
+    if(!state.units.LAB) return fail('กรุณาเลือกไฟล์ LAB ก่อน');
 
-    const parsed=parseLabExtraNames($('labExtraNames')?.value||'');
-    if(parsed.unknown.length) return fail(`ไม่พบรายชื่อ: ${parsed.unknown.join(', ')}`);
-    if(!parsed.matched.length) return fail('กรุณาใส่รายชื่อผู้มาช่วย');
+    const rawText=$('labExtraNames')?.value||'';
+    const parsed=parseLabExtraNames(rawText);
+    if(!parsed.total) return fail('กรุณาใส่รายชื่อผู้มาช่วย');
 
     const next=[...state.labExtraSupport];
     for(const staff of parsed.matched){
       next.push({date,slot,employeeCode:staff.employeeCode,nick:staff.nick});
     }
     state.labExtraSupport=cleanLabExtraSupport(next);
-    if($('labExtraNames')) $('labExtraNames').value='';
     renderLabExtraSupport();
     recompute();
 
-    const added=labExtraSupportRecords().filter(x=>x.date===date&&x.slot===slot);
-    toast(`เพิ่มแล้ว • ช่วยเพิ่มจริง ${added.filter(x=>!x.onDuty).length} คน • มีเวรเดิม ${added.filter(x=>x.onDuty).length} คน`);
+    if(parsed.unresolved.length){
+      const remain=parsed.unresolved.map(x=>x.input).join('\n');
+      if($('labExtraNames')) $('labExtraNames').value=remain;
+      const hints=parsed.unresolved.map(x=>{
+        const sug=x.suggestions?.[0];
+        return sug?`${x.input} → ใกล้เคียง ${sug.nick}`:x.input;
+      }).join(' • ');
+      const msg=parsed.matched.length
+        ? `เพิ่มแล้ว ${parsed.matched.length} คน • เหลือให้ตรวจ ${parsed.unresolved.length} ชื่อ: ${hints}`
+        : `ยังจับคู่ชื่อไม่ได้: ${hints}`;
+      if(err){err.hidden=false;err.textContent=msg;err.classList.add('lab-extra-warning');}
+      toast(msg);
+      return;
+    }
+
+    if($('labExtraNames')) $('labExtraNames').value='';
+    toast(`เพิ่มรายชื่อแล้ว ${parsed.matched.length} คน`);
   }
 
   async function saveLabExtraSupport() {

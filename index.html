@@ -13,7 +13,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=20261008-v242" />
+  <link rel="stylesheet" href="styles.css?v=20261008-v243" />
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3EOT%3C/text%3E%3C/svg%3E">
   <style>
     /* Critical: author CSS (.center-shell { display:grid }) must not override HTML hidden state */
@@ -202,8 +202,11 @@
                   <option value="16">16:00–00:00</option>
                 </select>
               </label>
-              <label class="lab-extra-names">รายชื่อผู้มาช่วย
-                <textarea id="labExtraNames" rows="3" placeholder="ชื่อหรือชื่อเล่น คนละ 1 บรรทัด"></textarea>
+              <label class="lab-extra-names">รายชื่อผู้มาช่วย (หลายคนได้)
+                <textarea id="labExtraNames" rows="4" placeholder="พิมพ์หรือวางรายชื่อ คนละ 1 บรรทัด
+เช่น อัฐฒพงษ์
+ชลมณี
+ปาลีรัตน์"></textarea>
               </label>
               <div class="lab-extra-actions">
                 <button id="addLabExtraBtn" class="secondary-btn" type="button">เพิ่มรายการ</button>
@@ -474,7 +477,7 @@
             <li><b>เลือกรอบเดือน</b><span>เช่น รอบเดือนกันยายน คือวันที่ 16 สิงหาคม ถึง 15 กันยายน</span></li>
             <li><b>ตรวจวันหยุดรอบนี้</b><span>เสาร์–อาทิตย์ระบบแสดงให้อัตโนมัติ ถ้ามีวันหยุดนักขัตฤกษ์ให้เพิ่มวันที่ก่อนอ่านตาราง</span></li>
             <li><b>เลือกไฟล์เวรให้ครบ 3 หน่วย</b><span>เลือก LAB, Molec และ Bacteria ของรอบนั้น</span></li>
-            <li><b>ใส่ OT LAB ช่วยเพิ่ม ถ้ามี</b><span>เลือกวันที่ เวลา และใส่รายชื่อจากใบลงเวลา</span></li>
+            <li><b>ใส่ OT LAB ช่วยเพิ่ม ถ้ามี</b><span>เลือกวันที่และเวลา แล้วพิมพ์หรือวางหลายชื่อได้ คนละ 1 บรรทัด</span></li>
             <li><b>ใส่วันที่ 00000328 ถ้ามี</b><span>ใส่เฉพาะวันที่ HR แจ้งช่วงปีใหม่หรือสงกรานต์ ถ้าเดือนไหนไม่มีให้ข้าม</span></li>
             <li><b>ดึงวันลา</b><span>ตรวจจำนวนวันลาที่ดึงมา และดูว่ามีรายการใดตรงกับเวรหรือไม่</span></li>
             <li><b>ตรวจสรุป OT</b><span>เช็กชื่อ ชั่วโมง และรายการเตือนให้เรียบร้อย</span></li>
@@ -652,7 +655,7 @@
     };
     window.PSC_OT_CONFIG = window.LAB_OT_CONFIG;
   </script>
-  <script src="app.js?v=20261008-42"></script>
+  <script src="app.js?v=20261008-43"></script>
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(console.warn));

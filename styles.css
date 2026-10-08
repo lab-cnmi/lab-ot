@@ -1724,3 +1724,14 @@ input[type=email],input[type=password],input[type=number],input[type=date],selec
     padding:13px 14px 15px;
   }
 }
+
+/* V2.43 — manual multi-helper name input */
+.lab-extra-warning{
+  background:#fff8e8;
+  border:1px solid #f0d58d;
+  color:#875c08;
+  border-radius:10px;
+  padding:9px 11px;
+  margin-top:8px;
+}
+.lab-extra-names textarea{line-height:1.55;}
