@@ -1819,9 +1819,9 @@
 
     const specialEligibility=buildSpecial328Eligibility(assignments);
     const special328=hrAllocateSpecial328(specialEligibility);
-    const labExtra=hrBuildLabExtraClaims(assignments,holidaySet,special328.rows);
-    const combinedSpecialRows=[...special328.rows,...labExtra.specialRows];
-    const allocation=hrAllocate(totals,holidaySet,combinedSpecialRows,labExtra.normalLockedRows);
+    const labExtra=hrBuildLabExtraNormalClaims(assignments,holidaySet);
+    const combinedSpecialRows=[...special328.rows];
+    const allocation=hrAllocate(totals,holidaySet,combinedSpecialRows,labExtra.rows);
 
     const byCode=new Map();
     for(const t of totals){
@@ -2322,19 +2322,24 @@
 
 
 
+
   /* ===========================
-     LAB EXTRA SUPPORT
-     Correct payroll rule:
-     - No LAB roster duty that date:
-       OT 130 + code 00000328 (240 / 8h)
-     - Has LAB roster duty that date:
-       existing OT 130 + extra OT 130
+     LAB EXTRA SUPPORT — V2.41
+     Payroll rule:
+     - "00000328" is a 240-baht benefit per ACTUAL 8-hour shift.
+     - It is NOT a 160/260 hourly rate.
+     - A person already on the LAB roster is NOT given another OT 130
+       just because the name also appears on the helper attendance sheet.
+     - A true extra helper (not already on LAB roster that date) gets
+       one normal OT 130 claim for the entered 8-hour shift.
+     - If that date is in special328Dates, the same actual shift also
+       gets one fixed 00000328 claim.
      =========================== */
   const LAB_EXTRA = Object.freeze({
-    hoursPerEntry: 8,
-    baseRate: 130,
-    helperTopupCode: '00000328',
-    helperTopupAmount: 240
+    hoursPerEntry:8,
+    baseRate:130,
+    helperTopupCode:'00000328',
+    helperTopupAmount:240
   });
 
   function cleanLabExtraSupport(list) {
@@ -2345,8 +2350,7 @@
       const employeeCode=String(raw?.employeeCode||'').replace(/\D/g,'').padStart(7,'0');
       const pair=Object.entries(HR_STAFF_MASTER).find(([,x])=>String(x.employeeCode).replace(/\D/g,'').padStart(7,'0')===employeeCode);
       if(!pair || !between(date,state.cycle.start,state.cycle.end)) continue;
-      const nick=pair[0];
-      const key=`${date}|${slot}|${employeeCode}`;
+      const nick=pair[0], key=`${date}|${slot}|${employeeCode}`;
       if(seen.has(key)) continue;
       seen.add(key);
       out.push({date,slot,employeeCode,nick});
@@ -2391,64 +2395,69 @@
     return map;
   }
 
-  function labExtraSupportAssignments() {
-    const out=[];
-    for(const item of cleanLabExtraSupport(state.labExtraSupport)){
+  function labExtraSupportRecords() {
+    const specialSet=new Set(cleanSpecial328Dates(state.special328Dates));
+    return cleanLabExtraSupport(state.labExtraSupport).map(item=>{
       const staff=hrStaff(item.nick);
-      if(!staff) continue;
-      const roster=labRosterDutyMap(item.date).get(staff.employeeCode)||[];
+      const roster=labRosterDutyMap(item.date).get(item.employeeCode)||[];
       const onDuty=roster.length>0;
       const times=hrSlotTimes(item.slot);
-      out.push({
-        unit:'LAB',
-        date:item.date,
-        sourceDate:item.date,
-        duty:onDuty?'ช่วยเพิ่ม (มีเวร LAB เดิม)':'ช่วยเพิ่ม',
-        name:item.nick,
-        hours:LAB_EXTRA.hoursPerEntry,
+      const special328=specialSet.has(item.date);
+      const normalPay=LAB_EXTRA.hoursPerEntry*LAB_EXTRA.baseRate;
+      return {
+        ...item,staff,roster,onDuty,special328,
         timeLabel:`${times.start}–${times.end}`,
-        holiday:false,
-        extraLabSupport:true,
-        labExtraOnDuty:onDuty,
-        exactSlot:item.slot,
-        rosterDuty:roster.map(x=>x.duty).join(', '),
-        labExtraScheme:onDuty?'130+130':'130+00000328'
-      });
-    }
-    return out;
+        normalPay,
+        topupPay:(!onDuty && special328)?LAB_EXTRA.helperTopupAmount:0,
+        totalExtraPay:onDuty?0:(normalPay+(special328?LAB_EXTRA.helperTopupAmount:0))
+      };
+    });
   }
 
-  function labExtraRowView(item) {
-    const staff=hrStaff(item.nick);
-    const roster=labRosterDutyMap(item.date).get(item.employeeCode)||[];
-    const onDuty=roster.length>0;
-    const times=hrSlotTimes(item.slot);
-    const normalPay=LAB_EXTRA.hoursPerEntry*LAB_EXTRA.baseRate;
-    const totalPay=onDuty ? normalPay*2 : normalPay+LAB_EXTRA.helperTopupAmount;
-    return {
-      ...item,staff,roster,onDuty,time:`${times.start}–${times.end}`,
-      scheme:onDuty?'130 + 130':'130 + 00000328',
-      totalPay
-    };
+  // Only true helpers become additional OT assignments.
+  // A person already rostered in LAB that day is already represented by
+  // the original LAB roster and must not receive another OT 130 row.
+  function labExtraSupportAssignments() {
+    return labExtraSupportRecords()
+      .filter(x=>!x.onDuty)
+      .map(x=>({
+        unit:'LAB',
+        date:x.date,
+        sourceDate:x.date,
+        duty:'ช่วยเพิ่ม',
+        name:x.nick,
+        hours:LAB_EXTRA.hoursPerEntry,
+        timeLabel:x.timeLabel,
+        holiday:false,
+        extraLabSupport:true,
+        exactSlot:x.slot,
+        special328:x.special328
+      }));
   }
 
   function renderLabExtraSupport() {
     state.labExtraSupport=cleanLabExtraSupport(state.labExtraSupport);
     const table=$('labExtraTable'),empty=$('labExtraEmpty'),badge=$('labExtraCountBadge');
     if(!table||!empty) return;
-    const rows=state.labExtraSupport.map(labExtraRowView);
+    const rows=labExtraSupportRecords();
     if(badge) badge.textContent=`${rows.length} รายการ`;
     empty.hidden=rows.length>0;
 
     table.innerHTML=rows.length?`<thead><tr>
-      <th>วันที่</th><th>เวลา</th><th>ชื่อ</th><th>เวร LAB เดิม</th><th>การเบิก</th><th class="num">รวม 8 ชม.</th><th></th>
+      <th>วันที่</th><th>เวลา</th><th>ชื่อ</th><th>เวร LAB เดิม</th><th>การเบิกเพิ่มจากรายการนี้</th><th class="num">เงินเพิ่ม</th><th></th>
     </tr></thead><tbody>${rows.map(x=>`<tr>
       <td><b>${esc(fmtThaiDate(x.date))}</b></td>
-      <td>${esc(x.time)}</td>
+      <td>${esc(x.timeLabel)}</td>
       <td>${esc(x.staff?.fullName||x.nick)}<div class="subtle">${esc(x.employeeCode)}</div></td>
-      <td>${x.onDuty?`<span class="lab-extra-duty">${esc(x.roster.map(r=>r.duty).join(', '))}</span>`:`<span class="lab-extra-helper">ไม่มีเวรเดิม</span>`}</td>
-      <td><b>${esc(x.scheme)}</b></td>
-      <td class="num"><b>${x.totalPay.toLocaleString('th-TH')}</b> บาท</td>
+      <td>${x.onDuty
+        ? `<span class="lab-extra-duty">${esc(x.roster.map(r=>r.duty).join(', '))}</span>`
+        : `<span class="lab-extra-helper">ไม่มีเวรเดิม</span>`}</td>
+      <td>${x.onDuty
+        ? `<b>ใช้เวรเดิม</b>${x.special328?` + <b>00000328 ตามผลัดจริง</b>`:''}`
+        : `<b>OT 130</b>${x.special328?` + <b>00000328</b>`:''}`}</td>
+      <td class="num">${x.onDuty
+        ? `<span class="subtle">ไม่สร้าง OT ซ้ำ</span>`
+        : `<b>${x.totalExtraPay.toLocaleString('th-TH')}</b> บาท`}</td>
       <td><button type="button" class="danger-btn compact" data-remove-lab-extra="${esc(`${x.date}|${x.slot}|${x.employeeCode}`)}">ลบ</button></td>
     </tr>`).join('')}</tbody>`:'';
 
@@ -2484,8 +2493,8 @@
     renderLabExtraSupport();
     recompute();
 
-    const added=state.labExtraSupport.filter(x=>x.date===date&&x.slot===slot).map(labExtraRowView);
-    toast(`เพิ่มแล้ว • 130 + 00000328 = ${added.filter(x=>!x.onDuty).length} คน • 130 + 130 = ${added.filter(x=>x.onDuty).length} คน`);
+    const added=labExtraSupportRecords().filter(x=>x.date===date&&x.slot===slot);
+    toast(`เพิ่มแล้ว • ช่วยเพิ่มจริง ${added.filter(x=>!x.onDuty).length} คน • มีเวรเดิม ${added.filter(x=>x.onDuty).length} คน`);
   }
 
   async function saveLabExtraSupport() {
@@ -2518,143 +2527,67 @@
     await writeAppLog('lab_extra_save','บันทึก OT LAB ช่วยเพิ่ม',`${state.labExtraSupport.length} รายการ`,'',cycleKey);
   }
 
-  function labExtraBaseExistingRowsFor(code,date,holidaySet,specialRows=[]) {
-    const out=[];
-    if(hrIsRegularWorkday(date,holidaySet)){
-      out.push({employeeCode:code,date,slot:8,baseline:true});
-    }
-    for(const r of (specialRows||[])){
-      if(r.employeeCode===code && r.date===date && r.claimKind!=='labExtra328') out.push(r);
-    }
-    return out;
-  }
-
-  function labExtraChooseNormalSlot(entry,holidaySet,specialRows,cellUse) {
-    const staff=hrStaff(entry.name);
-    if(!staff) return null;
-    const allowed=hrAllowedSlots(entry.date,holidaySet);
-    const preferred=entry.exactSlot===0?[0,16,8]:entry.exactSlot===16?[16,0,8]:[16,0,8];
-    const candidates=[...new Set([...preferred,...allowed])].filter(s=>allowed.includes(s));
-    const existing=labExtraBaseExistingRowsFor(staff.employeeCode,entry.date,holidaySet,specialRows);
-
-    for(const slot of candidates){
-      const key=`${entry.date}|${slot}`;
-      if((cellUse.get(key)||0)>=HR_DUMMY_ACTIVE_CAPACITY) continue;
-      if(hrWouldExceed16(existing,entry.date,slot)) continue;
-      return slot;
-    }
-    return null;
-  }
-
-  function labExtraChoose328Slot(entry,normalSlot,cellUse) {
-    const preferred=[entry.exactSlot,8,0,16].filter((v,i,a)=>[0,8,16].includes(v)&&a.indexOf(v)===i);
-    for(const slot of preferred){
-      if(slot===normalSlot) continue;
-      const key=`${entry.date}|${slot}`;
-      if((cellUse.get(key)||0)>=HR_DUMMY_ACTIVE_CAPACITY) continue;
-      return slot;
-    }
-    return null;
-  }
-
-  function hrBuildLabExtraClaims(assignments,holidaySet,special328Rows=[]) {
-    const normalLockedRows=[], specialRows=[], failures=[];
-    const cellUse=new Map();
-    for(const r of (special328Rows||[])){
-      const k=`${r.date}|${r.slot}`;
-      cellUse.set(k,(cellUse.get(k)||0)+1);
-    }
-
-    const entries=assignments
-      .filter(a=>a.extraLabSupport)
-      .sort((a,b)=>a.date.localeCompare(b.date)||a.name.localeCompare(b.name,'th'));
-
-    for(const a of entries){
+  // Lock the normal OT 130 of TRUE extra helpers to the actual entered shift.
+  function hrBuildLabExtraNormalClaims(assignments,holidaySet) {
+    const rows=[], failures=[], seen=new Set();
+    for(const a of assignments.filter(x=>x.extraLabSupport)){
       const staff=hrStaff(a.name);
       if(!staff) continue;
-
-      const normalSlot=labExtraChooseNormalSlot(a,holidaySet,special328Rows,cellUse);
-      if(normalSlot===null){
-        failures.push(`${staff.nick}: วันที่ ${fmtThaiDate(a.date)} ไม่มีช่อง OT 130 ที่ลงได้`);
+      const slot=Number(a.exactSlot);
+      if(![0,8,16].includes(slot)){
+        failures.push(`${staff.nick}: เวลา OT LAB ช่วยเพิ่มไม่ถูกต้อง`);
         continue;
       }
+      const key=`${staff.employeeCode}|${a.date}|${slot}`;
+      if(seen.has(key)) continue;
+      seen.add(key);
 
-      const normalTimes=hrSlotTimes(normalSlot);
-      const normalHoliday=hrIsDummyHoliday(a.date,holidaySet);
-      const normalRow={
+      const times=hrSlotTimes(slot);
+      const holiday=hrIsDummyHoliday(a.date,holidaySet);
+      rows.push({
         employeeCode:staff.employeeCode,nick:staff.nick,fullName:staff.fullName,
-        date:a.date,slot:normalSlot,...normalTimes,
-        type:normalHoliday?2:1,
-        claimCode:normalHoliday?HR_MT.holidayCode:HR_MT.normalCode,
+        date:a.date,slot,...times,
+        type:holiday?2:1,
+        claimCode:holiday?HR_MT.holidayCode:HR_MT.normalCode,
         claimKind:'labExtra130',
         dummyPhase:'LAB_EXTRA_EXACT',
-        sourceDate:a.date,sourceUnit:'LAB',sourceDuty:a.duty,sourceTime:a.timeLabel,
-        labExtraScheme:a.labExtraOnDuty?'130+130':'130+00000328'
-      };
-      normalLockedRows.push(normalRow);
-      cellUse.set(`${a.date}|${normalSlot}`,(cellUse.get(`${a.date}|${normalSlot}`)||0)+1);
-
-      if(!a.labExtraOnDuty){
-        const specialSlot=labExtraChoose328Slot(a,normalSlot,cellUse);
-        if(specialSlot===null){
-          failures.push(`${staff.nick}: วันที่ ${fmtThaiDate(a.date)} ไม่มีช่อง 00000328 ที่ลงได้`);
-          continue;
-        }
-        const times=hrSlotTimes(specialSlot);
-        const row={
-          employeeCode:staff.employeeCode,nick:staff.nick,fullName:staff.fullName,
-          date:a.date,slot:specialSlot,...times,type:4,claimCode:HR_SPECIAL_328.code,
-          claimKind:'labExtra328',specialAmount:HR_SPECIAL_328.amountPer8h,
-          sourceDate:a.date,sourceUnit:'LAB',sourceDuty:'ช่วยเพิ่ม',sourceTime:a.timeLabel,
-          labExtraScheme:'130+00000328'
-        };
-        specialRows.push(row);
-        cellUse.set(`${a.date}|${specialSlot}`,(cellUse.get(`${a.date}|${specialSlot}`)||0)+1);
-      }
+        sourceDate:a.date,sourceUnit:'LAB',sourceDuty:'ช่วยเพิ่ม',sourceTime:a.timeLabel
+      });
     }
-
-    normalLockedRows.sort((a,b)=>a.date.localeCompare(b.date)||a.slot-b.slot||a.nick.localeCompare(b.nick,'th'));
-    specialRows.sort((a,b)=>a.date.localeCompare(b.date)||a.slot-b.slot||a.nick.localeCompare(b.nick,'th'));
-    return {normalLockedRows,specialRows,failures};
+    rows.sort((a,b)=>a.date.localeCompare(b.date)||a.slot-b.slot||a.nick.localeCompare(b.nick,'th'));
+    return {rows,failures};
   }
 
-  function hrLabExtraSheet(assignments) {
-    const rows=assignments.filter(a=>a.extraLabSupport).map(a=>{
-      const staff=hrStaff(a.name);
-      const normalPay=LAB_EXTRA.hoursPerEntry*LAB_EXTRA.baseRate;
-      const topup=a.labExtraOnDuty?normalPay:LAB_EXTRA.helperTopupAmount;
-      return {
-        'วันที่':a.date,
-        'เวลาที่มาช่วย':a.timeLabel,
-        'รหัสพนักงาน':staff?.employeeCode||'',
-        'ชื่อ':staff?.fullName||a.name,
-        'ชื่อเล่น':staff?.nick||a.name,
-        'มีเวร LAB เดิม':a.labExtraOnDuty?'มี':'ไม่มี',
-        'เวร LAB เดิม':a.rosterDuty||'',
-        'การเบิก':a.labExtraOnDuty?'130 + 130':'130 + 00000328',
-        'OT 130 (บาท)':normalPay,
-        '00000328 (บาท)':a.labExtraOnDuty?0:LAB_EXTRA.helperTopupAmount,
-        'OT 130 เพิ่มอีกครั้ง (บาท)':a.labExtraOnDuty?normalPay:0,
-        'รวมสำหรับ 8 ชม. (บาท)':normalPay+topup,
-        'หมายเหตุ':a.labExtraOnDuty?'มีเวรเดิมวันเดียวกัน จึงเพิ่ม OT 130 อีก 8 ชม.':'ไม่มีเวร LAB เดิม จึงเบิก OT 130 + 00000328'
-      };
-    });
+  function hrLabExtraSheet() {
+    const rows=labExtraSupportRecords().map(x=>({
+      'วันที่':x.date,
+      'เวลาที่มาช่วย':x.timeLabel,
+      'รหัสพนักงาน':x.staff?.employeeCode||x.employeeCode,
+      'ชื่อ':x.staff?.fullName||x.nick,
+      'ชื่อเล่น':x.staff?.nick||x.nick,
+      'มีเวร LAB เดิม':x.onDuty?'มี':'ไม่มี',
+      'เวร LAB เดิม':x.roster.map(r=>r.duty).join(', '),
+      'วันที่มีสิทธิ์ 00000328':x.special328?'ใช่':'ไม่',
+      'การเบิกเพิ่มจากรายการช่วย':x.onDuty
+        ? (x.special328?'ไม่สร้าง OT 130 ซ้ำ; 00000328 ใช้จากเวรจริง':'ไม่สร้าง OT ซ้ำ')
+        : (x.special328?'OT 130 + 00000328':'OT 130'),
+      'OT 130 เพิ่ม (บาท)':x.onDuty?0:x.normalPay,
+      '00000328 เพิ่ม (บาท)':x.onDuty?0:x.topupPay,
+      'รวมเงินเพิ่มจากรายการนี้ (บาท)':x.totalExtraPay
+    }));
     return hrJsonSheet(rows,Object.keys(rows[0]||{
       'วันที่':'','เวลาที่มาช่วย':'','รหัสพนักงาน':'','ชื่อ':'','ชื่อเล่น':'','มีเวร LAB เดิม':'',
-      'เวร LAB เดิม':'','การเบิก':'','OT 130 (บาท)':'','00000328 (บาท)':'',
-      'OT 130 เพิ่มอีกครั้ง (บาท)':'','รวมสำหรับ 8 ชม. (บาท)':'','หมายเหตุ':''
-    }),[14,16,14,30,16,16,22,22,16,18,24,20,56]);
+      'เวร LAB เดิม':'','วันที่มีสิทธิ์ 00000328':'','การเบิกเพิ่มจากรายการช่วย':'',
+      'OT 130 เพิ่ม (บาท)':'','00000328 เพิ่ม (บาท)':'','รวมเงินเพิ่มจากรายการนี้ (บาท)':''
+    }),[14,16,14,30,16,16,24,20,48,18,20,24]);
   }
 
   /* ===========================
-     HR SPECIAL BENEFIT 00000328
-     - 240 THB per 8-hour occurrence.
-     - Entitlement comes ONLY from actual duty inside HR-announced dates.
-     - Dummy rows may move inside that announced window, but:
-       * exact entitlement count is preserved
-       * no overlapping slot
-       * no continuous work > 16 hours
-       * normal HR dummy must also respect these reserved special rows
+     HR SPECIAL BENEFIT 00000328 — V2.41
+     - 240 THB per ACTUAL 8-hour shift.
+     - Date + person + shift are fixed from the real roster / real helper entry.
+     - 00000328 is an additional payment code, not extra working hours.
+     - It must never be redistributed to another date/person/shift.
      =========================== */
   const HR_SPECIAL_328 = Object.freeze({
     code:'00000328',
@@ -2772,39 +2705,82 @@
     await writeAppLog('special328_save','บันทึกวันที่ 00000328',state.special328Dates.length?state.special328Dates.map(fmtThaiDate).join(', '):'ไม่มีวันที่','',currentCycleKey());
   }
 
+  function hrSpecial328SlotsForAssignment(a) {
+    const hours=Number(a?.hours)||0;
+    if(hours<8) return [];
+
+    if(a?.extraLabSupport && [0,8,16].includes(Number(a.exactSlot))){
+      return [Number(a.exactSlot)];
+    }
+
+    const time=String(a?.timeLabel||'').replace(/\s/g,'');
+    if(time.includes('00:00') && time.includes('08:00')) return [0];
+    if(time.includes('08:00') && time.includes('16:00')) return [8];
+    if(time.includes('16:00') && (time.includes('00:00') || time.includes('24:00'))) return [16];
+
+    // LAB / Molec roster:
+    // weekday 16 h = เวรดึก + เวรบ่ายของ "วันนั้น" => 00–08 and 16–24
+    // weekend/public holiday 24 h = ดึก + เช้า + บ่าย => 00–08, 08–16, 16–24
+    if(hours>=24) return [0,8,16];
+    if(hours>=16) return [0,16];
+    return [8];
+  }
+
   function buildSpecial328Eligibility(assignments=allAssignments()) {
     const dateSet=new Set(cleanSpecial328Dates(state.special328Dates));
     const map=new Map();
-    if (!dateSet.size) return [];
-    for (const a of assignments) {
-      if (a.extraLabSupport) continue;
-      if (!dateSet.has(a.date)) continue;
+    if(!dateSet.size) return [];
+
+    for(const a of assignments){
+      if(!dateSet.has(a.date)) continue;
       const staff=hrStaff(a.name);
-      if (!staff) continue;
-      const units=Math.floor((Number(a.hours)||0)/8);
-      if (!map.has(staff.employeeCode)) map.set(staff.employeeCode,{
-        ...staff,units:0,actualHours:0,sourceUnits:[],partialHours:0,sourceText:[]
-      });
-      const x=map.get(staff.employeeCode);
-      x.actualHours+=Number(a.hours)||0;
-      if (units>0) {
-        for (let i=0;i<units;i++) x.sourceUnits.push({
-          sourceDate:a.date,sourceUnit:a.unit,sourceDuty:a.duty,sourceTime:a.timeLabel||'',sourceHours:8
+      if(!staff) continue;
+
+      const slots=hrSpecial328SlotsForAssignment(a);
+      if(!slots.length) continue;
+
+      if(!map.has(staff.employeeCode)){
+        map.set(staff.employeeCode,{
+          ...staff,units:0,actualHours:0,sourceUnits:[],sourceText:[],seen:new Set()
         });
-        x.units+=units;
       }
-      const rem=(Number(a.hours)||0)%8;
-      if (rem) x.partialHours+=rem;
-      x.sourceText.push(`${fmtThaiDate(a.date)} · ${a.unit} ${a.duty} · ${a.timeLabel||`${a.hours} ชม.`}`);
+      const x=map.get(staff.employeeCode);
+
+      for(const slot of slots){
+        const key=`${a.date}|${slot}|${a.unit}|${a.duty}|${a.extraLabSupport?'extra':'roster'}`;
+        if(x.seen.has(key)) continue;
+        x.seen.add(key);
+        const times=hrSlotTimes(slot);
+        x.sourceUnits.push({
+          sourceDate:a.date,
+          sourceSlot:slot,
+          sourceUnit:a.unit,
+          sourceDuty:a.duty,
+          sourceTime:`${times.start}–${times.end}`,
+          sourceHours:8,
+          claimKind:a.extraLabSupport?'labExtra328':'special328'
+        });
+        x.units+=1;
+        x.actualHours+=8;
+      }
+
+      x.sourceText.push(`${fmtThaiDate(a.date)} · ${a.unit} ${a.duty} · ${a.extraLabSupport?a.timeLabel:(Number(a.hours)>=24?'ดึก/เช้า/บ่าย':'ดึก/บ่าย')}`);
     }
-    const rows=[...map.values()].filter(x=>x.units>0).sort((a,b)=>a.nick.localeCompare(b.nick,'th'));
+
+    const rows=[...map.values()]
+      .filter(x=>x.units>0)
+      .sort((a,b)=>a.nick.localeCompare(b.nick,'th'));
+
     const validCodes=new Set(rows.map(x=>x.employeeCode));
-    for (const k of Object.keys(state.special328Selected||{})) if (!validCodes.has(k)) delete state.special328Selected[k];
+    for(const k of Object.keys(state.special328Selected||{})){
+      if(!validCodes.has(k)) delete state.special328Selected[k];
+    }
+
     rows.forEach(x=>{
-      if (!(x.employeeCode in state.special328Selected)) state.special328Selected[x.employeeCode]=true;
+      if(!(x.employeeCode in state.special328Selected)) state.special328Selected[x.employeeCode]=true;
       x.selected=state.special328Selected[x.employeeCode]!==false;
       x.pay=x.units*HR_SPECIAL_328.amountPer8h;
-      x.capacity=cleanSpecial328Dates(state.special328Dates).length*2;
+      delete x.seen;
     });
     return rows;
   }
@@ -2825,15 +2801,14 @@
     }
     empty.hidden=true;
     table.innerHTML=`<thead><tr>
-      <th>เบิก</th><th>ชื่อ</th><th>เวรจริงในช่วงพิเศษ</th>
-      <th class="num">จำนวนสิทธิ์</th><th class="num">เงินเพิ่ม</th><th class="num">จัดได้สูงสุด</th>
+      <th>เบิก</th><th>ชื่อ</th><th>เวรจริง</th>
+      <th class="num">จำนวนผลัด</th><th class="num">เงินเพิ่ม</th>
     </tr></thead><tbody>${rows.map(x=>`<tr>
       <td><input type="checkbox" data-special328-code="${esc(x.employeeCode)}" ${x.selected?'checked':''}></td>
       <td><b>${esc(x.nick)}</b><div class="subtle">${esc(x.fullName)} · ${esc(x.employeeCode)}</div></td>
-      <td>${x.sourceText.map(s=>`<div>${esc(s)}</div>`).join('')}${x.partialHours?`<div class="warn-text">มี ${x.partialHours} ชม. ที่ยังไม่ครบ 8 ชม. จึงยังไม่นับเป็น 1 สิทธิ์</div>`:''}</td>
-      <td class="num"><b>${x.units}</b> ครั้ง</td>
+      <td>${x.sourceText.map(s=>`<div>${esc(s)}</div>`).join('')}</td>
+      <td class="num"><b>${x.units}</b> ผลัด</td>
       <td class="num"><b>${x.pay.toLocaleString('th-TH')}</b> บาท</td>
-      <td class="num">${x.capacity} ครั้ง ${x.units>x.capacity?'<div class="warn-text">ไม่พอ</div>':''}</td>
     </tr>`).join('')}</tbody>`;
   }
 
@@ -2862,57 +2837,40 @@
   }
 
   function hrAllocateSpecial328(eligibility) {
-    const dates=cleanSpecial328Dates(state.special328Dates);
-    const rows=[], failures=[], cellUse=new Map();
-    const selected=eligibility.filter(x=>x.selected);
-    const cellCount=(date,slot)=>cellUse.get(`${date}|${slot}`)||0;
+    const rows=[],failures=[],seen=new Set();
 
-    for (const person of selected) {
-      const need=person.units, sourceUnits=[...person.sourceUnits];
-      const leaveSet=hrLeaveDateSetForName(person.nick);
-      const usableDates=dates.filter(d=>!leaveSet.has(d));
-      const capacity=usableDates.length*2;
-      if (need>capacity) {
-        failures.push(`${person.nick}: ต้องเบิก ${need} ครั้ง แต่ช่วง ${dates.map(fmtThaiDate).join(', ')} หลังตัดวันลาวางได้สูงสุด ${capacity} ครั้ง`);
-        continue;
-      }
+    for(const person of eligibility.filter(x=>x.selected)){
+      for(const src of (person.sourceUnits||[])){
+        const date=String(src.sourceDate||'');
+        const slot=Number(src.sourceSlot);
+        if(!date || ![0,8,16].includes(slot)){
+          failures.push(`${person.nick}: อ่านวัน/ผลัดจริงของ 00000328 ไม่ได้`);
+          continue;
+        }
 
-      const personRows=[];
-      const candidateSlots=[];
-      usableDates.forEach(d=>{candidateSlots.push({date:d,slot:0},{date:d,slot:8},{date:d,slot:16});});
-      let placed=0;
+        const dedupe=`${person.employeeCode}|${date}|${slot}|${src.claimKind||'special328'}`;
+        if(seen.has(dedupe)) continue;
+        seen.add(dedupe);
 
-      for (let n=0;n<need;n++) {
-        const candidates=candidateSlots.filter(c=>{
-          if (cellCount(c.date,c.slot)>=HR_DUMMY_ACTIVE_CAPACITY) return false;
-          if (personRows.some(r=>r.date===c.date&&r.slot===c.slot)) return false;
-          const sameDay=personRows.filter(r=>r.date===c.date).length;
-          if (sameDay>=2) return false;
-          return !hrWouldExceed16(personRows,c.date,c.slot);
-        }).sort((a,b)=>{
-          const ac=personRows.filter(r=>r.date===a.date).length, bc=personRows.filter(r=>r.date===b.date).length;
-          if (ac!==bc) return ac-bc;
-          const au=cellCount(a.date,a.slot), bu=cellCount(b.date,b.slot);
-          if (au!==bu) return au-bu;
-          const pref=s=>s===0?0:s===8?1:2;
-          if (pref(a.slot)!==pref(b.slot)) return pref(a.slot)-pref(b.slot);
-          return a.date.localeCompare(b.date);
+        const times=hrSlotTimes(slot);
+        rows.push({
+          employeeCode:person.employeeCode,
+          nick:person.nick,
+          fullName:person.fullName,
+          date,
+          slot,
+          ...times,
+          type:4,
+          claimCode:HR_SPECIAL_328.code,
+          claimKind:src.claimKind||'special328',
+          specialAmount:HR_SPECIAL_328.amountPer8h,
+          sourceDate:date,
+          sourceUnit:src.sourceUnit||'',
+          sourceDuty:src.sourceDuty||'',
+          sourceTime:src.sourceTime||`${times.start}–${times.end}`,
+          fixedActualShift:true
         });
-        if (!candidates.length) break;
-
-        const c=candidates[0], times=hrSlotTimes(c.slot), src=sourceUnits[placed]||sourceUnits[sourceUnits.length-1]||{};
-        const row={
-          employeeCode:person.employeeCode,nick:person.nick,fullName:person.fullName,
-          date:c.date,slot:c.slot,...times,type:4,claimCode:HR_SPECIAL_328.code,
-          claimKind:'special328',specialAmount:HR_SPECIAL_328.amountPer8h,
-          sourceDate:src.sourceDate||'',sourceUnit:src.sourceUnit||'',sourceDuty:src.sourceDuty||'',sourceTime:src.sourceTime||''
-        };
-        personRows.push(row); rows.push(row);
-        cellUse.set(`${c.date}|${c.slot}`,cellCount(c.date,c.slot)+1);
-        placed++;
       }
-
-      if (placed<need) failures.push(`${person.nick}: จัด 00000328 ได้ ${placed}/${need} ครั้ง โดยยังคงเงื่อนไขไม่เกิน 16 ชม. ต่อเนื่อง และไม่ใช้แถว H`);
     }
 
     rows.sort((a,b)=>a.date.localeCompare(b.date)||a.slot-b.slot||a.nick.localeCompare(b.nick,'th'));
@@ -3004,7 +2962,7 @@
   function hrAllowedSlots(date,holidaySet) { return hrIsDummyHoliday(date,holidaySet) ? [0,8,16] : [0,16]; }
   function hrIsRegularWorkday(date,holidaySet) {
     const day=parseIso(date).getDay();
-    return day>=1 && day<=5 && !hrIsDummyHoliday(date,holidaySet) && !state.special328Dates.includes(date);
+    return day>=1 && day<=5 && !hrIsDummyHoliday(date,holidaySet);
   }
   function hrIsLeaveEvent(ev) {
     const s=String(ev?.summary||'').toLowerCase();
@@ -3065,7 +3023,9 @@
     const leaveMap=new Map(totals.map(t=>[t.employeeCode,hrLeaveDateSetForName(t.nick)]));
 
     const reservedByDate=new Map(), reservedByCell=new Map();
-    for(const r of [...(reservedRows||[]),...(lockedRows||[])]){
+    // Only locked NORMAL OT rows consume work capacity.
+    // 00000328 is an additional payment code on an already-real shift.
+    for(const r of (lockedRows||[])){
       reservedByDate.set(r.date,(reservedByDate.get(r.date)||0)+1);
       const k=`${r.date}|${r.slot}`;
       reservedByCell.set(k,(reservedByCell.get(k)||0)+1);
@@ -3108,15 +3068,8 @@
       }
     }
 
-    // 00000328 จองช่องไว้ก่อน
-    // labExtra328 เป็น "เงินเพิ่ม" ของช่วงเดียวกัน จึงจองพื้นที่ในตาราง
-    // แต่ไม่นับเป็นชั่วโมงทำงานเพิ่มตอนตรวจต่อเนื่อง 16 ชม.
-    for(const r of (reservedRows||[])){
-      if(r.claimKind==='labExtra328') continue;
-      daySlots(r.employeeCode,r.date).add(r.slot);
-      datesForStaff(r.employeeCode).add(r.date);
-      existingFor(r.employeeCode).push(r);
-    }
+    // 00000328 ไม่ใช่ชั่วโมงทำงานเพิ่ม จึงไม่เอาไปตรวจต่อเนื่อง
+    // และไม่กัน capacity ของตาราง OT ปกติ
 
     // OT LAB ช่วยเพิ่ม 130 ล็อกวันจริง
     for(const r of (lockedRows||[])){
@@ -3324,9 +3277,9 @@
         'ประเภทเวร':`${a.unit}-${a.duty}`,'ชั่วโมงจริง':x.actual,'เรทงานจริง (บาท/ชม.)':x.rate,
         'ฐาน HR (บาท/ชม.)':HR_MT.baseRate,'ชั่วโมงเทียบ HR':x.hrHours,'เงินตามงานจริง':x.money,
         'การแปลงเรท':a.extraLabSupport
-          ? (a.labExtraOnDuty
-              ? 'LAB ช่วยเพิ่ม: เวรเดิม 130 + OT ช่วยเพิ่ม 130'
-              : 'LAB ช่วยเพิ่ม: OT 130 + 00000328 240 บาท/8ชม.')
+          ? (state.special328Dates.includes(a.date)
+              ? 'LAB ช่วยเพิ่ม: OT 130 + 00000328 240 บาท/ผลัด 8 ชม.'
+              : 'LAB ช่วยเพิ่ม: OT 130')
           : 'MT 130 → ฐาน HR 130',
         'claim_status ก่อน Export':'ready'
       });
@@ -3367,8 +3320,18 @@
     ['ชื่อ','จำนวน','วันหยุดพิเศษ','คิดเงิน (บาท)','คิดเงิน (บาท) + วันที่ 13-15','โอทีทั้งหมด','เบิกจริง','ทบเดือนหน้า(ชม.)'].forEach((h,i)=>row1[23+i]=h);
     data.push(row1,row2);
     const byCell=new Map();
-    allocation.rows.forEach(x=>{const k=`${x.date}|${x.slot}`;if(!byCell.has(k))byCell.set(k,[]);byCell.get(k).push(x.nick);});
-    special328Rows.forEach(x=>{const k=`${x.date}|${x.slot}`;if(!byCell.has(k))byCell.set(k,[]);byCell.get(k).push(`${x.nick} [328]`);});
+    const cellBucket=k=>{
+      if(!byCell.has(k)) byCell.set(k,{special:[],normal:[]});
+      return byCell.get(k);
+    };
+    allocation.rows.forEach(x=>{
+      const k=`${x.date}|${x.slot}`;
+      cellBucket(k).normal.push(x.nick);
+    });
+    special328Rows.forEach(x=>{
+      const k=`${x.date}|${x.slot}`;
+      cellBucket(k).special.push(x.nick);
+    });
     for(let w=0;w<weeks;w++){
       const dateRow=Array(cols).fill(null);dateRow[0]='วันที่';
       const nameRows=Array.from({length:HR_DUMMY_DISPLAY_ROWS},(_,i)=>{const r=Array(cols).fill(null);r[0]=String.fromCharCode(65+i);return r;});
@@ -3376,7 +3339,14 @@
         const d=new Date(first);d.setDate(first.getDate()+w*7+day);const key=isoDate(d),c=1+day*3;
         if(key>=state.cycle.start&&key<=state.cycle.end){
           dateRow[c]=String(Number(key.slice(-2))).padStart(2,'0');
-          for(const slot of [0,8,16]){const names=byCell.get(`${key}|${slot}`)||[],col=c+(slot===0?0:slot===8?1:2);for(let i=0;i<Math.min(HR_DUMMY_DISPLAY_ROWS,names.length);i++)nameRows[i][col]=names[i];}
+          for(const slot of [0,8,16]){
+            const bucket=byCell.get(`${key}|${slot}`)||{special:[],normal:[]};
+            const special=[...new Set(bucket.special)];
+            const normal=bucket.normal.filter(n=>!special.includes(n));
+            const names=[...special.map(n=>`${n} [328]`),...normal];
+            const col=c+(slot===0?0:slot===8?1:2);
+            for(let i=0;i<Math.min(HR_DUMMY_DISPLAY_ROWS,names.length);i++) nameRows[i][col]=names[i];
+          }
         }
       }
       data.push(dateRow,...nameRows);
@@ -3407,18 +3377,27 @@
 
   function hrSpecial328Sheet(rows) {
     const data=rows.map(x=>({
-      'รหัสพนักงาน':x.employeeCode,'ชื่อ':x.fullName,'ชื่อเล่น':x.nick,
-      'วันที่เวรจริง':x.sourceDate,'หน่วยจริง':x.sourceUnit,'เวรจริง':x.sourceDuty,'เวลาจริง':x.sourceTime,
-      'วันที่ Dummy 00000328':x.date,'เวลาเข้า':x.start,'เวลาออก':x.end,
-      'รหัสเบิก':HR_SPECIAL_328.code,'ชั่วโมงต่อครั้ง':8,'ยอดต่อครั้ง (บาท)':HR_SPECIAL_328.amountPer8h,
+      'รหัสพนักงาน':x.employeeCode,
+      'ชื่อ':x.fullName,
+      'ชื่อเล่น':x.nick,
+      'วันที่เวรจริง':x.sourceDate,
+      'หน่วยจริง':x.sourceUnit,
+      'เวรจริง':x.sourceDuty,
+      'ผลัดจริง':x.sourceTime,
+      'เวลาเข้า':x.start,
+      'เวลาออก':x.end,
+      'รหัสเบิก':HR_SPECIAL_328.code,
+      'จำนวนผลัด':1,
+      'ยอดต่อผลัด (บาท)':HR_SPECIAL_328.amountPer8h,
+      'ยอดรายการ (บาท)':HR_SPECIAL_328.amountPer8h,
       'หมายเหตุ':x.claimKind==='labExtra328'
-        ? 'LAB ช่วยเพิ่ม: ไม่มีเวร LAB เดิมวันนั้น จึงเบิก OT 130 + 00000328'
-        : 'สิทธิ์จากเวรจริงในช่วงที่ HR ประกาศ; วันที่ Dummy ใช้เพื่อจัดรูปแบบเบิกโดยไม่ให้ต่อเนื่องเกิน 16 ชม.'
+        ? 'LAB ช่วยเพิ่ม: OT 130 + 00000328 ในวันและผลัดจริง'
+        : '00000328 ล็อกตามวันและผลัดจริงจากตารางเวร'
     }));
     return hrJsonSheet(data,Object.keys(data[0]||{
-      'รหัสพนักงาน':'','ชื่อ':'','ชื่อเล่น':'','วันที่เวรจริง':'','หน่วยจริง':'','เวรจริง':'','เวลาจริง':'',
-      'วันที่ Dummy 00000328':'','เวลาเข้า':'','เวลาออก':'','รหัสเบิก':'','ชั่วโมงต่อครั้ง':'','ยอดต่อครั้ง (บาท)':'','หมายเหตุ':''
-    }),[14,30,14,16,12,12,18,20,12,12,14,14,18,70]);
+      'รหัสพนักงาน':'','ชื่อ':'','ชื่อเล่น':'','วันที่เวรจริง':'','หน่วยจริง':'','เวรจริง':'','ผลัดจริง':'',
+      'เวลาเข้า':'','เวลาออก':'','รหัสเบิก':'','จำนวนผลัด':'','ยอดต่อผลัด (บาท)':'','ยอดรายการ (บาท)':'','หมายเหตุ':''
+    }),[14,30,14,16,12,18,18,12,12,14,14,18,18,58]);
   }
 
   function hrHrSheet(allocation,special328Rows=[]) {
@@ -3444,8 +3423,9 @@
       dummyOverflowPolicy:'G: 00000328 > public holiday > Sunday > Saturday; H reserved',
       special328Dates:[...state.special328Dates],special328Rows:special328Rows.length,special328Pay:hrRound2(special328Rows.length*HR_SPECIAL_328.amountPer8h),
       labExtraSupportCount:cleanLabExtraSupport(state.labExtraSupport).length,
-      labExtra130plus328Count:labExtraSupportAssignments().filter(x=>!x.labExtraOnDuty).length,
-      labExtra130plus130Count:labExtraSupportAssignments().filter(x=>x.labExtraOnDuty).length
+      labExtraTrueHelperCount:labExtraSupportRecords().filter(x=>!x.onDuty).length,
+      labExtraRosteredNameCount:labExtraSupportRecords().filter(x=>x.onDuty).length,
+      special328Policy:'fixed_actual_date_person_shift'
     };
     if(state.offline || !state.sb) return;
     const cycleKey=`${state.cycle.start}_${state.cycle.end}`;
@@ -3479,15 +3459,15 @@
       const special328=hrAllocateSpecial328(specialEligibility);
       if(special328.failures.length) throw new Error(`ยังจัดสิทธิ์ 00000328 ได้ไม่ครบ: ${special328.failures.join(' | ')}`);
 
-      const labExtra=hrBuildLabExtraClaims(assignments,holidaySet,special328.rows);
+      const labExtra=hrBuildLabExtraNormalClaims(assignments,holidaySet);
       if(labExtra.failures.length) throw new Error(`OT LAB ช่วยเพิ่มยังจัดไม่ครบ: ${labExtra.failures.join(' | ')}`);
 
-      const combinedSpecialRows=[...special328.rows,...labExtra.specialRows];
+      const combinedSpecialRows=[...special328.rows];
       const specialByCode=new Map();
       combinedSpecialRows.forEach(r=>specialByCode.set(r.employeeCode,(specialByCode.get(r.employeeCode)||0)+1));
       totals.forEach(t=>{t.special328Count=specialByCode.get(t.employeeCode)||0;t.special328Pay=t.special328Count*HR_SPECIAL_328.amountPer8h;});
 
-      const allocation=hrAllocate(totals,holidaySet,combinedSpecialRows,labExtra.normalLockedRows);
+      const allocation=hrAllocate(totals,holidaySet,combinedSpecialRows,labExtra.rows);
       if(!allocation.rows.length) throw new Error('ไม่มีชั่วโมง OT ที่พร้อมจัดลงไฟล์ HR');
       if(allocation.baseShortfallTotal>0){
         const sample=allocation.weekdayBaseShortfalls.slice(0,5).map(x=>`${fmtThaiDate(x.date)} ${String(x.slot).padStart(2,'0')}:00 ขาด ${x.gap}`).join(' | ');
@@ -3514,7 +3494,7 @@
       XLSX.utils.book_append_sheet(wb,hrNameSheet(totals),'name');
       XLSX.utils.book_append_sheet(wb,hrHrSheet(allocation,combinedSpecialRows),'HR_OT');
       XLSX.utils.book_append_sheet(wb,hrSpecial328Sheet(combinedSpecialRows),'00000328');
-      XLSX.utils.book_append_sheet(wb,hrLabExtraSheet(assignments),'LAB_Extra');
+      XLSX.utils.book_append_sheet(wb,hrLabExtraSheet(),'LAB_Extra');
       XLSX.utils.book_append_sheet(wb,hrJsonSheet(sourceRows,Object.keys(sourceRows[0]||{}),[14,30,14,14,12,24,34,42,14,12,16,12,16,16,44,20]),'Source_OT_1_to_End');
       XLSX.utils.book_append_sheet(wb,hrJsonSheet(summaryRows,Object.keys(summaryRows[0]||{}),[14,30,14,12,10,16,16,16,22,14,18,14,18,16]),'Staff_Total');
       XLSX.utils.book_append_sheet(wb,hrJsonSheet(carryRows,Object.keys(carryRows[0]||{'รหัสพนักงาน':'','ชื่อ':'','เดือน OT ปัจจุบัน':'','เดือนยอดทบยกมา':'','ยอดทบยกมา(ชม.)':'','OT เดือนนี้เทียบ HR':'','โอทีทั้งหมดรวมยอดทบ':'','เบิกจริง':'','ทบเดือนหน้า(ชม.)':'','หมายเหตุ':''}),[14,30,16,16,18,18,22,14,18,62]),'Carry_Forward');
@@ -3524,11 +3504,11 @@
       const fileName=`HR_OT_LAB_${stamp}_source_${state.cycle.start}_to_${state.cycle.end}_dummy_${state.cycle.start}_to_${state.cycle.end}.xlsx`;
       XLSX.writeFile(wb,fileName);
       const carry=hrRound2(totals.reduce((s,t)=>s+t.carry,0));
-      const extraRows=assignments.filter(a=>a.extraLabSupport);
-      const extra130plus328=extraRows.filter(a=>!a.labExtraOnDuty).length;
-      const extra130plus130=extraRows.filter(a=>a.labExtraOnDuty).length;
-      toast(`Export HR สำเร็จ • LAB ช่วยเพิ่ม 130+00000328 ${extra130plus328} รายการ • 130+130 ${extra130plus130} รายการ • 00000328 รวม ${combinedSpecialRows.length} ครั้ง • ทบเดือนหน้า ${carry} ชม.`);
-      await writeAppLog('export_hr','Export HR Excel',`${allocation.rows.length} ช่วง OT · LAB 130+328 ${extra130plus328} · LAB 130+130 ${extra130plus130} · 00000328 รวม ${combinedSpecialRows.length} ครั้ง`,'',currentCycleKey());
+      const extraRecords=labExtraSupportRecords();
+      const extraHelpers=extraRecords.filter(x=>!x.onDuty).length;
+      const rosteredNames=extraRecords.filter(x=>x.onDuty).length;
+      toast(`Export HR สำเร็จ • LAB ช่วยเพิ่มจริง ${extraHelpers} รายการ • ชื่อที่มีเวรเดิม ${rosteredNames} รายการ • 00000328 ตามผลัดจริง ${combinedSpecialRows.length} ผลัด • ทบเดือนหน้า ${carry} ชม.`);
+      await writeAppLog('export_hr','Export HR Excel',`${allocation.rows.length} ช่วง OT · LAB ช่วยเพิ่ม ${extraHelpers} · 00000328 ตามผลัดจริง ${combinedSpecialRows.length}`,'',currentCycleKey());
       if(state.snapshotAt){
         try{
           await syncAckRequests();

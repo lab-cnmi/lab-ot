@@ -1,10 +1,10 @@
-const CACHE_NAME = 'lab-ot-shell-v240';
+const CACHE_NAME = 'lab-ot-shell-v241';
 const SHELL = [
   './',
   './index.html',
-  './styles.css?v=20261008-v240',
-  './app.js?v=20261008-40',
-  './manifest.webmanifest?v=20261008-24',
+  './styles.css?v=20261008-v241',
+  './app.js?v=20261008-41',
+  './manifest.webmanifest?v=20261008-25',
   './icons/icon-192.png',
   './icons/icon-512.png',
   './icons/apple-touch-icon.png'
