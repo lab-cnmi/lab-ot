@@ -1387,3 +1387,30 @@ td{line-height:1.45}
 @media(max-width:800px){
   .round-holiday-grid{grid-template-columns:1fr}
 }
+
+
+/* V2.40 — OT LAB ช่วยเพิ่ม */
+.lab-extra-card{border-color:#dbe8ef}
+.lab-extra-form{
+  display:grid;
+  grid-template-columns:minmax(165px,.7fr) minmax(190px,.8fr) minmax(340px,1.8fr) auto;
+  gap:12px;
+  align-items:end;
+}
+.lab-extra-form label{min-width:0}
+.lab-extra-form input,.lab-extra-form select,.lab-extra-form textarea{width:100%;box-sizing:border-box}
+.lab-extra-form textarea{min-height:92px;resize:vertical}
+.lab-extra-actions{display:flex;gap:8px;align-items:end}
+.lab-extra-duty,.lab-extra-helper{
+  display:inline-flex;align-items:center;border-radius:999px;padding:5px 9px;font-weight:700;font-size:12px
+}
+.lab-extra-duty{background:#fff0e2;color:#98510b}
+.lab-extra-helper{background:#eaf6ef;color:#227245}
+@media(max-width:1000px){
+  .lab-extra-form{grid-template-columns:1fr 1fr}
+  .lab-extra-names,.lab-extra-actions{grid-column:1/-1}
+}
+@media(max-width:620px){
+  .lab-extra-form{grid-template-columns:1fr}
+  .lab-extra-names,.lab-extra-actions{grid-column:auto}
+}
