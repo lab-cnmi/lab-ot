@@ -224,6 +224,13 @@
               </div>
             </div>
 
+            <details class="new-staff-registration"><summary>+ เพิ่มบุคลากรใหม่ (ยังไม่มีชื่อในตารางเวร)</summary>
+              <div class="new-staff-fields"><label>ชื่อ-นามสกุล <input id="labNewStaffName" placeholder="น.ส. ภาณินี มงคลสุข" /></label>
+              <label>รหัสพนักงาน 7 หลัก <input id="labNewStaffCode" inputmode="numeric" maxlength="7" placeholder="กรอกรหัสจริง" /></label>
+              <button type="button" id="labNewStaffBtn" class="secondary-btn">เพิ่มชื่อ</button></div>
+              <p class="subtle">ต้องใช้รหัสพนักงานจริงเพื่อป้องกันการเบิกผิดคน · เพิ่มแล้วเลือกชื่อในรายการผู้มาช่วย และกดบันทึก</p>
+            </details>
+            <div id="labShiftReview" class="lab-shift-review"></div>
             <div id="labExtraError" class="form-error" hidden></div>
             <div id="labExtraEmpty" class="empty-state compact-empty">ยังไม่มีรายการ</div>
             <div class="table-wrap compact-table-wrap"><table id="labExtraTable"></table></div>
@@ -665,7 +672,7 @@
     };
     window.PSC_OT_CONFIG = window.LAB_OT_CONFIG;
   </script>
-  <script src="app.js?v=20261008-47"></script>
+  <script src="app.js?v=20261008-48"></script>
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(console.warn));

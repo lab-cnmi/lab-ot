@@ -42,6 +42,7 @@
     special328Dates: [],
     special328Selected: {},
     labExtraSupport: [],
+    customStaff: [],
     ackPeople: {},
     ackRows: [],
     ackDbReady: true,
@@ -1399,6 +1400,7 @@
     $('addLabExtraBtn')?.addEventListener('click', addLabExtraSupport);
     $('saveLabExtraBtn')?.addEventListener('click', saveLabExtraSupport);
     $('labExtraPickerBtn')?.addEventListener('click', toggleLabExtraPicker);
+    $('labNewStaffBtn')?.addEventListener('click', registerLabNewStaff);
     $('labExtraStaffSearch')?.addEventListener('input', renderLabExtraStaffPicker);
     $('labExtraClearSelectionBtn')?.addEventListener('click', ()=>{ labExtraPickerSelection.clear(); renderLabExtraStaffPicker(); });
     $('labExtraStaffList')?.addEventListener('change', e=>{
@@ -2449,6 +2451,84 @@
   // V2.44 — transient checkbox selection for LAB helpers
   const labExtraPickerSelection = new Set();
 
+  // V2.48: new employees require verified payroll ID; stored with the OT batch.
+  function registerLabNewStaff() {
+    const name=String($('labNewStaffName')?.value||'').trim();
+    const code=String($('labNewStaffCode')?.value||'').trim();
+    if(!name || !/^\d{7}$/.test(code)) return toast('ระบุชื่อ-นามสกุล และรหัสพนักงาน 7 หลักก่อน');
+    const stripped=labExtraStripTitle(name);
+    const nick=stripped.split(/\s+/)[0];
+    if(!nick) return toast('กรุณาระบุชื่อให้ถูกต้อง');
+    const exists=Object.entries(HR_STAFF_MASTER).find(([k,v])=>k===nick || v.employeeCode===code);
+    if(exists && (exists[0]!==nick || exists[1].employeeCode!==code)) return toast('ชื่อหรือรหัสพนักงานตรงกับบุคคลอื่น กรุณาตรวจสอบ');
+    HR_STAFF_MASTER[nick]={fullName:name,employeeCode:code};
+    state.customStaff=Array.from(new Map([...(state.customStaff||[]),{nick,fullName:name,employeeCode:code}].map(x=>[x.employeeCode,x])).values());
+    if($('labNewStaffName')) $('labNewStaffName').value='';
+    if($('labNewStaffCode')) $('labNewStaffCode').value='';
+    renderLabExtraStaffPicker();
+    toast('เพิ่มบุคลากรใหม่แล้ว กรุณาเลือกชื่อและกดบันทึกรายการ OT');
+  }
+  function restoreCustomStaff(rows) {
+    state.customStaff=Array.isArray(rows)?rows.filter(x=>/^\d{7}$/.test(String(x.employeeCode||''))):[];
+    for(const x of state.customStaff) if(x.nick && x.fullName) HR_STAFF_MASTER[x.nick]={fullName:x.fullName,employeeCode:x.employeeCode};
+  }
+  function labDutyHours(date) {
+    const holidays=hrHolidayDates(allRosterAssignments());
+    return hrIsDummyHoliday(date,holidays)?16:8;
+  }
+  function allRosterAssignments() { return UNITS.flatMap(u=>state.units[u]?.assignments||[]); }
+  function labShiftReview() {
+    const helpers=cleanLabExtraSupport(state.labExtraSupport);
+    const holidaySet=hrHolidayDates(allRosterAssignments());
+    const warnings=[];
+    const byPersonDay=new Map();
+    for(const x of allRosterAssignments()) {
+      const st=hrStaff(x.name); if(!st) continue;
+      const key=st.employeeCode+'|'+x.date;
+      const val=byPersonDay.get(key)||{staff:st,date:x.date,roster:[],helpers:[]};
+      val.roster.push(x);byPersonDay.set(key,val);
+    }
+    for(const x of helpers) {
+      const st=hrStaff(x.nick); if(!st) continue;
+      const key=st.employeeCode+'|'+x.date;
+      const val=byPersonDay.get(key)||{staff:st,date:x.date,roster:[],helpers:[]};
+      val.helpers.push(x); byPersonDay.set(key,val);
+    }
+    for(const val of byPersonDay.values()) {
+      if(!val.helpers.length && !val.roster.length) continue;
+      const holiday=hrIsDummyHoliday(val.date,holidaySet), cap=holiday?16:8;
+      // LAB roster files label A-D but do not encode precise clock boundaries.
+      // Weekend roster is treated as 16h per person's original shift for this advisory.
+      const lab=val.roster.filter(x=>x.unit==='LAB');
+      const other=val.roster.filter(x=>x.unit!=='LAB');
+      const baseline=(lab.length?(holiday?16:8):0)+(other.length?(holiday?16:8):0);
+      const helperHours=val.helpers.length*8;
+      const normal=holiday?0:8;
+      const overall=normal+baseline+helperHours;
+      const outside=baseline+helperHours;
+      if(outside<=cap && overall<=16) continue;
+      const alternatives=[];
+      for(const date of hrDateList(state.cycle.start,state.cycle.end)) {
+        if(date===val.date || !hrIsDummyHoliday(date,holidaySet)) continue;
+        const dayKey=val.staff.employeeCode+'|'+date;
+        const proposed=byPersonDay.get(dayKey);
+        if(proposed && (proposed.roster.length||proposed.helpers.length)) continue;
+        alternatives.push(date);
+        if(alternatives.length===2) break;
+      }
+      warnings.push({val,holiday,cap,outside,overall,alternatives});
+    }
+    return warnings.sort((a,b)=>a.val.date.localeCompare(b.val.date)||a.val.staff.nick.localeCompare(b.val.staff.nick,'th'));
+  }
+  function renderLabShiftReview(){
+    const box=$('labShiftReview');if(!box)return;
+    const warnings=labShiftReview();
+    box.innerHTML=`<div class="shift-review-heading"><b>ตรวจชั่วโมง / แนวทางสลับผลัด (เสนอเท่านั้น)</b><span class="pill">${warnings.length} คนต้องตรวจ</span></div>
+      <p class="subtle">วันทำการ: งานปกติ 8 ชม. + นอกเวลาไม่เกิน 8 ชม. · วันหยุด: ไม่เกิน 16 ชม. ระบบยังไม่แก้เวรหรือเงินโดยอัตโนมัติ</p>`+
+      (warnings.length?`<div class="shift-review-rows">${warnings.map(w=>`<div class="shift-review-row"><b>${esc(w.val.staff.fullName)} · ${esc(fmtThaiDate(w.val.date))}</b>
+       <div>ประเมินรวม ${w.overall} ชม. (${w.holiday?'วันหยุด':'วันทำการ'}) · นอกเวลา ${w.outside} ชม. / เกณฑ์ ${w.cap} ชม.</div>
+       <div class="subtle">${w.alternatives.length?`ลองตรวจการสลับผลัดกับวันที่ ${w.alternatives.map(fmtThaiDate).join(' หรือ ')} (วันดังกล่าวไม่พบเวรของคนนี้)`: 'ยังไม่พบวันหยุดอื่นในรอบที่คนนี้ไม่มีเวรเพื่อเสนอเป็นทางเลือก'} · ต้องตรวจเวลา A–D, ผู้รับเวร และการทำงานข้ามวันก่อนอนุมัติ</div></div>`).join('')}</div>`:'<div class="subtle">ไม่พบรายการเกินเกณฑ์จากข้อมูลที่โหลดไว้ (ยังต้องตรวจเวลาจริงของเวร A–D)</div>');
+  }
   function cleanLabExtraSupport(list) {
     const out=[], seen=new Set();
     for(const raw of (Array.isArray(list)?list:[])){
@@ -2570,7 +2650,7 @@
     const inactiveCodes=new Set((state.managedUsers||[])
       .filter(u=>u.active===false && u.employeeCode)
       .map(u=>String(u.employeeCode).replace(/\D/g,'').padStart(7,'0')));
-    return collectFileStaffAuditRows()
+    const rosterRows=collectFileStaffAuditRows()
       .filter(row=>row.inMaster && row.employeeCode && !inactiveCodes.has(row.employeeCode))
       .map(row=>{
         const staff=hrStaff(row.rawName);
@@ -2582,6 +2662,8 @@
         };
       })
       .sort((a,b)=>a.fullName.localeCompare(b.fullName,'th')||a.employeeCode.localeCompare(b.employeeCode));
+    for(const x of (state.customStaff||[])) if(!inactiveCodes.has(x.employeeCode) && !rosterRows.some(r=>r.employeeCode===x.employeeCode)) rosterRows.push({...x,units:'บุคลากรใหม่'});
+    return rosterRows;
   }
 
   function labExtraPickerExistingCodes() {
@@ -2740,12 +2822,13 @@
         ? `<b>ใช้เวรเดิม</b>${x.special328?` + <b>00000328 ตามผลัดจริง</b>`:''}`
         : `<b>OT 130</b>${x.special328?` + <b>00000328</b>`:''}`}</td>
       <td class="num">${x.onDuty
-        ? `<span class="subtle">ไม่สร้าง OT ซ้ำ</span>`
+        ? `<span class="subtle">มีเวรเดิม · ตรวจชั่วโมงรวมด้านล่าง</span>`
         : `<b>${x.totalExtraPay.toLocaleString('th-TH')}</b> บาท`}</td>
       <td><button type="button" class="danger-btn compact" data-remove-lab-extra="${esc(`${x.date}|${x.slot}|${x.employeeCode}`)}">ลบ</button></td>
     </tr>`).join('')}</tbody>`:'';
 
     renderLabExtraStaffPicker();
+    renderLabShiftReview();
 
     table.querySelectorAll('[data-remove-lab-extra]').forEach(btn=>btn.addEventListener('click',()=>{
       const key=btn.dataset.removeLabExtra;
@@ -2802,6 +2885,7 @@
       ...(old?.payload||{}),
       cycle:{...state.cycle},
       labExtraSupport:[...state.labExtraSupport],
+      customStaff:[...state.customStaff],
       labExtraSupportUpdatedAt:new Date().toISOString(),
       labExtraSupportUpdatedBy:String(state.session?.user?.email||'')
     };
@@ -2915,6 +2999,7 @@
 
     const payload = data?.[0]?.payload || {};
     state.manualHolidayDates = cleanManualHolidayDates(payload.manualHolidayDates || []);
+    restoreCustomStaff(payload.customStaff||[]);
     state.labExtraSupport = cleanLabExtraSupport(payload.labExtraSupport || []);
     state.special328Dates = cleanSpecial328Dates(payload.special328Dates || []);
     state.special328Selected =
@@ -3183,7 +3268,7 @@
     premiumCode:'00000076', specialCode:'00000328'
   });
 
-  const HR_STAFF_MASTER = Object.freeze({
+  const HR_STAFF_MASTER = {
     'อัฐฒพงษ์':{fullName:'นาย อัฐฒพงษ์ สารารัตน์',employeeCode:'0017593'},
     'วุฒิศักดิ์':{fullName:'นาย วุฒิศักดิ์ ตรีสารวัฒน์',employeeCode:'0017594'},
     'พนิดา':{fullName:'น.ส. พนิดา พรสุโรจน์',employeeCode:'0017596'},
@@ -3220,7 +3305,7 @@
     'อติชาติ':{fullName:'นาย อติชาติ ยิ้มโสด',employeeCode:'0026231'},
     'ณรงค์ชัย':{fullName:'นาย ณรงค์ชัย คำมูลตรี',employeeCode:'0027961'},
     'จิณห์นิภา':{fullName:'น.ส. จิณห์นิภา ไตรอนันต์วุฒิกุล',employeeCode:'0027960'}
-  });
+  };
 
   const hrRound2 = v => Math.round((Number(v)||0)*100)/100;
   function hrStaff(name) {
@@ -3726,7 +3811,7 @@
       version:'2.1-all-units-hr-export',cycle:{...state.cycle},
       units:Object.fromEntries(UNITS.map(u=>[u,state.units[u]])),
       calendarSources:state.calendarSources,leaveEvents:state.leaveEvents,
-      manualHolidayDates:[...state.manualHolidayDates],labExtraSupport:[...state.labExtraSupport],
+      manualHolidayDates:[...state.manualHolidayDates],labExtraSupport:[...state.labExtraSupport],customStaff:[...state.customStaff],
       calendarSyncedAt:state.calendarSyncedAt,conflicts:state.conflicts,special328Dates:[...state.special328Dates],special328Selected:{...state.special328Selected},savedAt:state.snapshotAt||now,hrExport:state.hrExport
     };
     const {error}=await state.sb.from('ot_batches').upsert({
@@ -3830,7 +3915,7 @@
       calendarSources:state.calendarSources, leaveEvents:state.leaveEvents,
       calendarSyncedAt:state.calendarSyncedAt, conflicts:state.conflicts,
       manualHolidayDates:[...state.manualHolidayDates],
-      labExtraSupport:[...state.labExtraSupport],
+      labExtraSupport:[...state.labExtraSupport],customStaff:[...state.customStaff],
       special328Dates:[...state.special328Dates], special328Selected:{...state.special328Selected}, savedAt:now, hrExport:state.hrExport
     };
     $('saveBtn').disabled=true;
@@ -3884,6 +3969,7 @@
     state.cycle=p.cycle; state.units=p.units||{LAB:null,Molec:null,Bacteria:null}; state.rawFiles={LAB:null,Molec:null,Bacteria:null};
     state.calendarSources=p.calendarSources||[]; state.leaveEvents=p.leaveEvents||[]; state.calendarSyncedAt=p.calendarSyncedAt||null; state.snapshotAt=data.snapshot_at||p.savedAt||null; state.loadedSnapshot=true; state.hrExport=p.hrExport||null;
     state.manualHolidayDates=cleanManualHolidayDates(p.manualHolidayDates||[]);
+    restoreCustomStaff(p.customStaff||[]);
     state.labExtraSupport=cleanLabExtraSupport(p.labExtraSupport||[]);
     resetLabExtraPicker(true);
     state.special328Dates=cleanSpecial328Dates(p.special328Dates||[]);

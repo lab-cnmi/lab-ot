@@ -1896,3 +1896,7 @@ input[type=email],input[type=password],input[type=number],input[type=date],selec
 .file-staff-row.file-staff-inactive td{background:#fffaf2}
 .file-staff-row.file-staff-review td{background:#fcfdfe}
 @media(max-width:760px){.file-staff-audit-metrics{grid-template-columns:repeat(2,1fr)}.file-staff-audit-toolbar{align-items:flex-start}}
+
+/* v2.48 */
+.new-staff-registration,.lab-shift-review{margin:12px 0;padding:13px;border:1px solid #dce6ed;border-radius:12px;background:#fafcfe}
+.new-staff-registration summary{cursor:pointer;font-weight:700;color:#276588}.new-staff-fields{display:flex;gap:10px;align-items:end;flex-wrap:wrap;margin-top:12px}.new-staff-fields label{flex:1;min-width:190px}.new-staff-fields input{display:block;width:100%;margin-top:5px}.shift-review-heading{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}.shift-review-row{padding:12px 0;border-top:1px solid #e5edf3;line-height:1.7}.shift-review-rows{max-height:320px;overflow:auto}
