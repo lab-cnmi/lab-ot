@@ -147,7 +147,7 @@
     updateCycleTitle();
     if (old && old !== state.cycle.start) {
       state.calendarSources = []; state.leaveEvents = []; state.calendarSyncedAt = null; state.snapshotAt = null; state.loadedSnapshot = false; state.hrExport = null;
-      state.manualHolidayDates=[]; state.labExtraSupport=[]; renderRoundHolidaySettings(); renderLabExtraSupport();
+      state.manualHolidayDates=[]; state.labExtraSupport=[]; resetLabExtraPicker(true); renderRoundHolidaySettings(); renderLabExtraSupport();
       state.summaryPage=1; state.ackPage=1; state.conflictPage=1; state.leavePage=1; state.ackEmailDrafts={};
       for (const unit of UNITS) {
         const raw = state.rawFiles[unit];
@@ -1284,6 +1284,10 @@
         if ($('viewModeMenu')) $('viewModeMenu').hidden = true;
         $('viewModeBtn')?.setAttribute('aria-expanded','false');
       }
+      if (!$('labExtraPickerWrap')?.contains(e.target)) {
+        if ($('labExtraPickerPanel')) $('labExtraPickerPanel').hidden = true;
+        $('labExtraPickerBtn')?.setAttribute('aria-expanded','false');
+      }
     });
     $('emailInput')?.addEventListener('blur', e => {
       const v = String(e.target.value || '').trim();
@@ -1306,6 +1310,18 @@
     $('manualHolidayDatePicker')?.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();addManualHolidayDateFromPicker();}});
     $('addLabExtraBtn')?.addEventListener('click', addLabExtraSupport);
     $('saveLabExtraBtn')?.addEventListener('click', saveLabExtraSupport);
+    $('labExtraPickerBtn')?.addEventListener('click', toggleLabExtraPicker);
+    $('labExtraStaffSearch')?.addEventListener('input', renderLabExtraStaffPicker);
+    $('labExtraClearSelectionBtn')?.addEventListener('click', ()=>{ labExtraPickerSelection.clear(); renderLabExtraStaffPicker(); });
+    $('labExtraStaffList')?.addEventListener('change', e=>{
+      const cb=e.target.closest('[data-lab-extra-code]');
+      if(!cb) return;
+      if(cb.checked) labExtraPickerSelection.add(cb.dataset.labExtraCode);
+      else labExtraPickerSelection.delete(cb.dataset.labExtraCode);
+      updateLabExtraPickerSummary();
+    });
+    $('labExtraDate')?.addEventListener('change', renderLabExtraStaffPicker);
+    $('labExtraSlot')?.addEventListener('change', renderLabExtraStaffPicker);
     $('addSpecial328DateBtn')?.addEventListener('click', addSpecial328DateFromPicker);
     $('saveSpecial328DatesBtn')?.addEventListener('click', saveSpecial328Dates);
     $('special328DatePicker')?.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); addSpecial328DateFromPicker(); } });
@@ -2342,6 +2358,9 @@
     helperTopupAmount:240
   });
 
+  // V2.44 — transient checkbox selection for LAB helpers
+  const labExtraPickerSelection = new Set();
+
   function cleanLabExtraSupport(list) {
     const out=[], seen=new Set();
     for(const raw of (Array.isArray(list)?list:[])){
@@ -2457,6 +2476,94 @@
     return {matched,unresolved,total:parts.length};
   }
 
+  function labExtraPickerRows() {
+    return Object.entries(HR_STAFF_MASTER)
+      .map(([nick,info])=>({
+        nick,
+        fullName:staffDisplayNameByCode(info.fullName,String(info.employeeCode)),
+        employeeCode:String(info.employeeCode).replace(/\D/g,'').padStart(7,'0')
+      }))
+      .sort((a,b)=>a.fullName.localeCompare(b.fullName,'th')||a.employeeCode.localeCompare(b.employeeCode));
+  }
+
+  function labExtraPickerExistingCodes() {
+    const date=String($('labExtraDate')?.value||'').trim();
+    const slot=Number($('labExtraSlot')?.value||8);
+    return new Set(cleanLabExtraSupport(state.labExtraSupport)
+      .filter(x=>x.date===date && Number(x.slot)===slot)
+      .map(x=>x.employeeCode));
+  }
+
+  function updateLabExtraPickerSummary() {
+    const count=labExtraPickerSelection.size;
+    const countEl=$('labExtraSelectedCount');
+    const summary=$('labExtraSelectedSummary');
+    const addBtn=$('addLabExtraBtn');
+    if(countEl) countEl.textContent=`${count} คน`;
+    if(addBtn) addBtn.disabled=count===0;
+
+    if(summary){
+      if(!count){
+        summary.textContent='ยังไม่ได้เลือก';
+      } else {
+        const names=labExtraPickerRows()
+          .filter(x=>labExtraPickerSelection.has(x.employeeCode))
+          .map(x=>x.nick);
+        const shown=names.slice(0,4);
+        summary.textContent=`เลือกแล้ว: ${shown.join(', ')}${names.length>4?` +${names.length-4}`:''}`;
+      }
+    }
+  }
+
+  function renderLabExtraStaffPicker() {
+    const list=$('labExtraStaffList');
+    if(!list) return;
+    const existing=labExtraPickerExistingCodes();
+    for(const code of existing) labExtraPickerSelection.delete(code);
+
+    const query=normSearch($('labExtraStaffSearch')?.value||'');
+    const rows=labExtraPickerRows().filter(x=>{
+      if(!query) return true;
+      return [x.nick,x.fullName,x.employeeCode,labExtraStripTitle(x.fullName)]
+        .some(v=>normSearch(v).includes(query));
+    });
+
+    list.innerHTML=rows.length?rows.map(x=>{
+      const already=existing.has(x.employeeCode);
+      const checked=labExtraPickerSelection.has(x.employeeCode);
+      return `<label class="lab-helper-staff-option ${already?'already-added':''}">
+        <input type="checkbox" data-lab-extra-code="${esc(x.employeeCode)}" ${checked?'checked':''} ${already?'disabled':''}>
+        <span class="lab-helper-staff-copy">
+          <b>${esc(x.fullName)}</b>
+          <small>${esc(x.nick)} · ${esc(x.employeeCode)}${already?' · เพิ่มแล้ว':''}</small>
+        </span>
+      </label>`;
+    }).join(''):'<div class="lab-helper-no-result">ไม่พบรายชื่อ</div>';
+    updateLabExtraPickerSummary();
+  }
+
+  function resetLabExtraPicker(closePanel=true) {
+    labExtraPickerSelection.clear();
+    if($('labExtraStaffSearch')) $('labExtraStaffSearch').value='';
+    const panel=$('labExtraPickerPanel');
+    const btn=$('labExtraPickerBtn');
+    if(panel && closePanel) panel.hidden=true;
+    if(btn) btn.setAttribute('aria-expanded','false');
+    renderLabExtraStaffPicker();
+  }
+
+  function toggleLabExtraPicker() {
+    const panel=$('labExtraPickerPanel');
+    const btn=$('labExtraPickerBtn');
+    if(!panel||!btn) return;
+    panel.hidden=!panel.hidden;
+    btn.setAttribute('aria-expanded',String(!panel.hidden));
+    if(!panel.hidden){
+      renderLabExtraStaffPicker();
+      setTimeout(()=>$('labExtraStaffSearch')?.focus(),0);
+    }
+  }
+
   function labRosterDutyMap(date) {
     const map=new Map();
     for(const a of (state.units.LAB?.assignments||[])){
@@ -2537,6 +2644,8 @@
       <td><button type="button" class="danger-btn compact" data-remove-lab-extra="${esc(`${x.date}|${x.slot}|${x.employeeCode}`)}">ลบ</button></td>
     </tr>`).join('')}</tbody>`:'';
 
+    renderLabExtraStaffPicker();
+
     table.querySelectorAll('[data-remove-lab-extra]').forEach(btn=>btn.addEventListener('click',()=>{
       const key=btn.dataset.removeLabExtra;
       state.labExtraSupport=state.labExtraSupport.filter(x=>`${x.date}|${x.slot}|${x.employeeCode}`!==key);
@@ -2555,36 +2664,26 @@
     if(!date) return fail('กรุณาเลือกวันที่');
     if(!between(date,state.cycle.start,state.cycle.end)) return fail('วันที่ต้องอยู่ในรอบ OT ที่เลือก');
     if(!state.units.LAB) return fail('กรุณาเลือกไฟล์ LAB ก่อน');
+    if(!labExtraPickerSelection.size) return fail('กรุณาเลือกผู้มาช่วยอย่างน้อย 1 คน');
 
-    const rawText=$('labExtraNames')?.value||'';
-    const parsed=parseLabExtraNames(rawText);
-    if(!parsed.total) return fail('กรุณาใส่รายชื่อผู้มาช่วย');
+    const selectedCodes=[...labExtraPickerSelection];
+    const selectedStaff=selectedCodes.map(code=>{
+      const pair=Object.entries(HR_STAFF_MASTER).find(([,x])=>String(x.employeeCode).replace(/\D/g,'').padStart(7,'0')===code);
+      return pair?hrStaff(pair[0]):null;
+    }).filter(Boolean);
+    if(!selectedStaff.length) return fail('ไม่พบรายชื่อที่เลือก');
 
+    const before=cleanLabExtraSupport(state.labExtraSupport).length;
     const next=[...state.labExtraSupport];
-    for(const staff of parsed.matched){
+    for(const staff of selectedStaff){
       next.push({date,slot,employeeCode:staff.employeeCode,nick:staff.nick});
     }
     state.labExtraSupport=cleanLabExtraSupport(next);
+    const added=Math.max(0,state.labExtraSupport.length-before);
+    resetLabExtraPicker(true);
     renderLabExtraSupport();
     recompute();
-
-    if(parsed.unresolved.length){
-      const remain=parsed.unresolved.map(x=>x.input).join('\n');
-      if($('labExtraNames')) $('labExtraNames').value=remain;
-      const hints=parsed.unresolved.map(x=>{
-        const sug=x.suggestions?.[0];
-        return sug?`${x.input} → ใกล้เคียง ${sug.nick}`:x.input;
-      }).join(' • ');
-      const msg=parsed.matched.length
-        ? `เพิ่มแล้ว ${parsed.matched.length} คน • เหลือให้ตรวจ ${parsed.unresolved.length} ชื่อ: ${hints}`
-        : `ยังจับคู่ชื่อไม่ได้: ${hints}`;
-      if(err){err.hidden=false;err.textContent=msg;err.classList.add('lab-extra-warning');}
-      toast(msg);
-      return;
-    }
-
-    if($('labExtraNames')) $('labExtraNames').value='';
-    toast(`เพิ่มรายชื่อแล้ว ${parsed.matched.length} คน`);
+    toast(added?`เพิ่มผู้มาช่วยแล้ว ${added} คน`:'รายชื่อที่เลือกมีอยู่ในวันและเวลานี้แล้ว');
   }
 
   async function saveLabExtraSupport() {
@@ -2689,6 +2788,7 @@
   async function loadSpecial328Settings() {
     state.manualHolidayDates = [];
     state.labExtraSupport = [];
+    resetLabExtraPicker(true);
     state.special328Dates = [];
     state.special328Selected = {};
     renderRoundHolidaySettings();
@@ -3682,6 +3782,7 @@
     state.calendarSources=p.calendarSources||[]; state.leaveEvents=p.leaveEvents||[]; state.calendarSyncedAt=p.calendarSyncedAt||null; state.snapshotAt=data.snapshot_at||p.savedAt||null; state.loadedSnapshot=true; state.hrExport=p.hrExport||null;
     state.manualHolidayDates=cleanManualHolidayDates(p.manualHolidayDates||[]);
     state.labExtraSupport=cleanLabExtraSupport(p.labExtraSupport||[]);
+    resetLabExtraPicker(true);
     state.special328Dates=cleanSpecial328Dates(p.special328Dates||[]);
     state.special328Selected=(p.special328Selected&&typeof p.special328Selected==='object')?{...p.special328Selected}:{};
     renderRoundHolidaySettings(); renderLabExtraSupport(); renderSpecial328Dates(); renderSpecial328Eligibility();
