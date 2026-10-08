@@ -2569,17 +2569,23 @@
     return {matched,unresolved,total:parts.length};
   }
 
+  // V2.46: the helper picker and the file-staff audit use the SAME current-cycle file assignments.
+  // Account creation is not required for OT eligibility; explicitly inactive accounts are excluded.
   function labExtraPickerRows() {
     const inactiveCodes=new Set((state.managedUsers||[])
       .filter(u=>u.active===false && u.employeeCode)
       .map(u=>String(u.employeeCode).replace(/\D/g,'').padStart(7,'0')));
-    return Object.entries(HR_STAFF_MASTER)
-      .map(([nick,info])=>({
-        nick,
-        fullName:staffDisplayNameByCode(info.fullName,String(info.employeeCode)),
-        employeeCode:String(info.employeeCode).replace(/\D/g,'').padStart(7,'0')
-      }))
-      .filter(x=>!inactiveCodes.has(x.employeeCode))
+    return collectFileStaffAuditRows()
+      .filter(row=>row.inMaster && row.employeeCode && !inactiveCodes.has(row.employeeCode))
+      .map(row=>{
+        const staff=hrStaff(row.rawName);
+        return {
+          nick:staff.nick,
+          fullName:staffDisplayNameByCode(staff.fullName,staff.employeeCode),
+          employeeCode:staff.employeeCode,
+          units:row.unitText
+        };
+      })
       .sort((a,b)=>a.fullName.localeCompare(b.fullName,'th')||a.employeeCode.localeCompare(b.employeeCode));
   }
 
@@ -2616,7 +2622,10 @@
     const list=$('labExtraStaffList');
     if(!list) return;
     const existing=labExtraPickerExistingCodes();
-    for(const code of existing) labExtraPickerSelection.delete(code);
+    const eligible=new Set(labExtraPickerRows().map(x=>x.employeeCode));
+    for(const code of [...labExtraPickerSelection]) {
+      if(existing.has(code) || !eligible.has(code)) labExtraPickerSelection.delete(code);
+    }
 
     const query=normSearch($('labExtraStaffSearch')?.value||'');
     const rows=labExtraPickerRows().filter(x=>{
@@ -2635,7 +2644,7 @@
           <small>${esc(x.nick)} · ${esc(x.employeeCode)}${already?' · เพิ่มแล้ว':''}</small>
         </span>
       </label>`;
-    }).join(''):'<div class="lab-helper-no-result">ไม่พบรายชื่อ</div>';
+    }).join(''):`<div class="lab-helper-no-result">${query?'ไม่พบชื่อที่ค้นหา':'ไม่พบรายชื่อจากไฟล์ OT รอบนี้ที่เลือกได้ กรุณาตรวจสอบไฟล์และสถานะ Active'}</div>`;
     updateLabExtraPickerSummary();
   }
 
@@ -2762,6 +2771,8 @@
     if(!between(date,state.cycle.start,state.cycle.end)) return fail('วันที่ต้องอยู่ในรอบ OT ที่เลือก');
     if(!state.units.LAB) return fail('กรุณาเลือกไฟล์ LAB ก่อน');
     if(!labExtraPickerSelection.size) return fail('กรุณาเลือกผู้มาช่วยอย่างน้อย 1 คน');
+    const allowed=new Set(labExtraPickerRows().map(x=>x.employeeCode));
+    if([...labExtraPickerSelection].some(code=>!allowed.has(code))) return fail('รายชื่อที่เลือกไม่อยู่ในไฟล์ OT รอบนี้ หรือถูกปิด Active กรุณาเลือกใหม่');
 
     const selectedCodes=[...labExtraPickerSelection];
     const selectedStaff=selectedCodes.map(code=>{
