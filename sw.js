@@ -1,4 +1,4 @@
-const CACHE_NAME = 'lab-ot-shell-v248';
+const CACHE_NAME = 'lab-ot-shell-v249';
 const SHELL = [
   './',
   './index.html',

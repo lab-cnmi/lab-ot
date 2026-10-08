@@ -1900,3 +1900,36 @@ input[type=email],input[type=password],input[type=number],input[type=date],selec
 /* v2.48 */
 .new-staff-registration,.lab-shift-review{margin:12px 0;padding:13px;border:1px solid #dce6ed;border-radius:12px;background:#fafcfe}
 .new-staff-registration summary{cursor:pointer;font-weight:700;color:#276588}.new-staff-fields{display:flex;gap:10px;align-items:end;flex-wrap:wrap;margin-top:12px}.new-staff-fields label{flex:1;min-width:190px}.new-staff-fields input{display:block;width:100%;margin-top:5px}.shift-review-heading{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}.shift-review-row{padding:12px 0;border-top:1px solid #e5edf3;line-height:1.7}.shift-review-rows{max-height:320px;overflow:auto}
+
+/* v2.49 — compact OT hour review */
+.lab-shift-review{padding:0;background:#fff;overflow:hidden}
+.shift-review-details{margin:0}
+.shift-review-summary{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 14px;cursor:pointer;list-style:none}
+.shift-review-summary::-webkit-details-marker{display:none}
+.shift-review-summary:before{content:'›';font-size:20px;line-height:1;color:#6d8797;transform:rotate(0deg);transition:transform .15s ease;flex:0 0 auto}
+.shift-review-details[open]>.shift-review-summary:before{transform:rotate(90deg)}
+.shift-review-summary-main{display:flex;align-items:baseline;gap:10px;min-width:0;flex:1}
+.shift-review-summary-main b{white-space:nowrap;color:#24465b}
+.shift-review-rule{font-size:12px;color:#7a8e9b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.shift-review-pill-warn{background:#fff2e8;color:#a85d25}
+.shift-review-pill-ok{background:#eaf7ef;color:#28794a}
+.shift-review-body{border-top:1px solid #e5edf3;padding:0 14px 12px}
+.shift-review-rows{max-height:250px;overflow:auto}
+.shift-review-row{padding:10px 0;border-top:1px solid #edf2f5;line-height:1.45}
+.shift-review-row:first-child{border-top:0}
+.shift-review-row-main{display:grid;grid-template-columns:minmax(180px,1fr) auto auto;gap:10px;align-items:center}
+.shift-review-row-main b{color:#243e51}
+.shift-review-row-main span{font-size:13px;color:#667d8c;white-space:nowrap}
+.shift-review-row-main strong{font-size:12px;color:#a85d25;background:#fff2e8;border-radius:999px;padding:3px 8px;white-space:nowrap}
+.shift-review-meta{font-size:12px;color:#6f8391;margin-top:3px}
+.shift-review-suggest{font-size:12px;color:#4d6d80;margin-top:3px}
+.shift-review-note{font-size:11px;color:#8495a0;border-top:1px solid #edf2f5;padding-top:9px;margin-top:4px}
+.shift-review-ok{padding:12px 0;color:#4e7b61;font-size:13px}
+@media(max-width:720px){
+  .shift-review-summary{align-items:flex-start;flex-wrap:wrap}
+  .shift-review-summary-main{display:block}
+  .shift-review-rule{display:block;margin-top:2px;white-space:normal}
+  .shift-review-summary .pill{margin-left:28px}
+  .shift-review-row-main{grid-template-columns:1fr auto}
+  .shift-review-row-main strong{grid-column:1/-1;justify-self:start}
+}

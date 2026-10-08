@@ -2523,11 +2523,19 @@
   function renderLabShiftReview(){
     const box=$('labShiftReview');if(!box)return;
     const warnings=labShiftReview();
-    box.innerHTML=`<div class="shift-review-heading"><b>ตรวจชั่วโมง / แนวทางสลับผลัด (เสนอเท่านั้น)</b><span class="pill">${warnings.length} คนต้องตรวจ</span></div>
-      <p class="subtle">วันทำการ: งานปกติ 8 ชม. + นอกเวลาไม่เกิน 8 ชม. · วันหยุด: ไม่เกิน 16 ชม. ระบบยังไม่แก้เวรหรือเงินโดยอัตโนมัติ</p>`+
-      (warnings.length?`<div class="shift-review-rows">${warnings.map(w=>`<div class="shift-review-row"><b>${esc(w.val.staff.fullName)} · ${esc(fmtThaiDate(w.val.date))}</b>
-       <div>ประเมินรวม ${w.overall} ชม. (${w.holiday?'วันหยุด':'วันทำการ'}) · นอกเวลา ${w.outside} ชม. / เกณฑ์ ${w.cap} ชม.</div>
-       <div class="subtle">${w.alternatives.length?`ลองตรวจการสลับผลัดกับวันที่ ${w.alternatives.map(fmtThaiDate).join(' หรือ ')} (วันดังกล่าวไม่พบเวรของคนนี้)`: 'ยังไม่พบวันหยุดอื่นในรอบที่คนนี้ไม่มีเวรเพื่อเสนอเป็นทางเลือก'} · ต้องตรวจเวลา A–D, ผู้รับเวร และการทำงานข้ามวันก่อนอนุมัติ</div></div>`).join('')}</div>`:'<div class="subtle">ไม่พบรายการเกินเกณฑ์จากข้อมูลที่โหลดไว้ (ยังต้องตรวจเวลาจริงของเวร A–D)</div>');
+    const countLabel=warnings.length?`${warnings.length} รายการเกินเกณฑ์`:'ไม่พบรายการเกินเกณฑ์';
+    box.innerHTML=`<details class="shift-review-details">
+      <summary class="shift-review-summary">
+        <span class="shift-review-summary-main"><b>ตรวจชั่วโมง OT</b><span class="shift-review-rule">วันทำการ นอกเวลา ≤ 8 ชม. · วันหยุด ≤ 16 ชม.</span></span>
+        <span class="pill ${warnings.length?'shift-review-pill-warn':'shift-review-pill-ok'}">${countLabel}</span>
+      </summary>
+      <div class="shift-review-body">`+
+      (warnings.length?`<div class="shift-review-rows">${warnings.map(w=>`<div class="shift-review-row">
+        <div class="shift-review-row-main"><b>${esc(w.val.staff.fullName)}</b><span>${esc(fmtThaiDate(w.val.date))}</span><strong>${w.overall} ชม. · เกินเกณฑ์</strong></div>
+        <div class="shift-review-meta">${w.holiday?'วันหยุด':'วันทำการ'} · นอกเวลา ${w.outside} ชม. / เกณฑ์ ${w.cap} ชม.</div>
+        <div class="shift-review-suggest">${w.alternatives.length?`วันที่ว่างที่ควรตรวจแทน: <b>${w.alternatives.map(fmtThaiDate).join(' หรือ ')}</b>`:'ยังไม่พบวันว่างอื่นในรอบนี้'}</div>
+      </div>`).join('')}</div>`:'<div class="shift-review-ok">ไม่พบรายการที่เกินเกณฑ์จากข้อมูลที่โหลดไว้</div>')+
+      `<div class="shift-review-note">หมายเหตุ: ระบบแนะนำเพื่อช่วยตรวจเท่านั้น ยังไม่สลับเวร A–D หรือแก้ยอดเงินอัตโนมัติ</div></div></details>`;
   }
   function cleanLabExtraSupport(list) {
     const out=[], seen=new Set();
