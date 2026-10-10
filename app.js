@@ -2484,10 +2484,12 @@
     return hrIsDummyHoliday(date,holidays)?16:8;
   }
   function allRosterAssignments() { return UNITS.flatMap(u=>state.units[u]?.assignments||[]); }
+  // v2.51: A–D roster has no clock start/end. Never sum overlapping
+  // LAB/Molec roster records as proven consecutive working hours.
+  // Separate confirmed individual shifts from ambiguous cross-unit assignments.
   function labShiftReview() {
     const helpers=cleanLabExtraSupport(state.labExtraSupport);
     const holidaySet=hrHolidayDates(allRosterAssignments());
-    const warnings=[];
     const byPersonDay=new Map();
     for(const x of allRosterAssignments()) {
       const st=hrStaff(x.name); if(!st) continue;
@@ -2499,38 +2501,37 @@
       const st=hrStaff(x.nick); if(!st) continue;
       const key=st.employeeCode+'|'+x.date;
       const val=byPersonDay.get(key)||{staff:st,date:x.date,roster:[],helpers:[]};
-      val.helpers.push(x); byPersonDay.set(key,val);
+      val.helpers.push(x);byPersonDay.set(key,val);
     }
+    const warnings=[];
     for(const val of byPersonDay.values()) {
-      if(!val.helpers.length && !val.roster.length) continue;
       const holiday=hrIsDummyHoliday(val.date,holidaySet), cap=holiday?16:8;
-      // LAB roster files label A-D but do not encode precise clock boundaries.
-      // Weekend roster is treated as 16h per person's original shift for this advisory.
-      const lab=val.roster.filter(x=>x.unit==='LAB');
-      const other=val.roster.filter(x=>x.unit!=='LAB');
-      const baseline=(lab.length?(holiday?16:8):0)+(other.length?(holiday?16:8):0);
-      const helperHours=val.helpers.length*8;
-      const normal=holiday?0:8;
-      const overall=normal+baseline+helperHours;
-      const outside=baseline+helperHours;
-      if(outside<=cap && overall<=16) continue;
+      const unknown=val.roster.filter(x=>x.unit!=='Bacteria');
+      const timed=val.roster.filter(x=>x.unit==='Bacteria');
+      // Duty A–D is not a clock interval. Even a single 24h duty must be
+      // reviewed; multiple units on one day must not be summed blindly.
+      const uncertain=unknown.length>1 || (unknown.length>0&&(timed.length>0||val.helpers.length>0));
+      const baseline=unknown.length?Math.max(...unknown.map(x=>Number(x.hours)||0)):0;
+      const preciseHours=timed.reduce((sum,x)=>sum+(Number(x.hours)||0),0)+val.helpers.length*8;
+      const outside=baseline+preciseHours;
+      const overall=(holiday?0:8)+outside;
+      if(!uncertain && outside<=cap && overall<=16) continue;
       const alternatives=[];
       for(const date of hrDateList(state.cycle.start,state.cycle.end)) {
         if(date===val.date || !hrIsDummyHoliday(date,holidaySet)) continue;
-        const dayKey=val.staff.employeeCode+'|'+date;
-        const proposed=byPersonDay.get(dayKey);
+        const proposed=byPersonDay.get(val.staff.employeeCode+'|'+date);
         if(proposed && (proposed.roster.length||proposed.helpers.length)) continue;
         alternatives.push(date);
         if(alternatives.length===2) break;
       }
-      warnings.push({val,holiday,cap,outside,overall,alternatives});
+      warnings.push({val,holiday,cap,outside,overall,uncertain,alternatives});
     }
     return warnings.sort((a,b)=>a.val.date.localeCompare(b.val.date)||a.val.staff.nick.localeCompare(b.val.staff.nick,'th'));
   }
   function renderLabShiftReview(){
     const box=$('labShiftReview');if(!box)return;
     const warnings=labShiftReview();
-    const countLabel=warnings.length?`${warnings.length} รายการเกินเกณฑ์`:'ไม่พบรายการเกินเกณฑ์';
+    const countLabel=warnings.length?`${warnings.length} รายการต้องตรวจ`:'ไม่พบรายการต้องตรวจ';
     box.innerHTML=`<details class="shift-review-details">
       <summary class="shift-review-summary">
         <span class="shift-review-summary-main"><b>ตรวจชั่วโมง OT</b><span class="shift-review-rule">วันทำการ นอกเวลา ≤ 8 ชม. · วันหยุด ≤ 16 ชม.</span></span>
@@ -2538,11 +2539,11 @@
       </summary>
       <div class="shift-review-body">`+
       (warnings.length?`<div class="shift-review-rows">${warnings.map(w=>`<div class="shift-review-row">
-        <div class="shift-review-row-main"><b>${esc(w.val.staff.fullName)}</b><span>${esc(fmtThaiDate(w.val.date))}</span><strong>${w.overall} ชม. · เกินเกณฑ์</strong></div>
-        <div class="shift-review-meta">${w.holiday?'วันหยุด':'วันทำการ'} · นอกเวลา ${w.outside} ชม. / เกณฑ์ ${w.cap} ชม.</div>
-        <div class="shift-review-suggest">${w.alternatives.length?`วันที่ว่างที่ควรตรวจแทน: <b>${w.alternatives.map(fmtThaiDate).join(' หรือ ')}</b>`:'ยังไม่พบวันว่างอื่นในรอบนี้'}</div>
-      </div>`).join('')}</div>`:'<div class="shift-review-ok">ไม่พบรายการที่เกินเกณฑ์จากข้อมูลที่โหลดไว้</div>')+
-      `<div class="shift-review-note">หมายเหตุ: ระบบแนะนำเพื่อช่วยตรวจเท่านั้น ยังไม่สลับเวร A–D หรือแก้ยอดเงินอัตโนมัติ</div></div></details>`;
+        <div class="shift-review-row-main"><b>${esc(w.val.staff.fullName)}</b><span>${esc(fmtThaiDate(w.val.date))}</span><strong>${w.uncertain?'เวรอาจซ้อนกัน · ตรวจเวลา':'ตรวจเวร '+w.outside+' ชม.'}</strong></div>
+        <div class="shift-review-meta">${w.holiday?'วันหยุด':'วันทำการ'} · เกณฑ์นอกเวลา ${w.cap} ชม. · ${w.uncertain?'พบเวรหลายแหล่งที่ไม่มีเวลา A–D จึงยังสรุปชั่วโมงต่อเนื่องไม่ได้':'ชั่วโมงตามข้อมูลเวร '+w.outside+' ชม.'}</div>
+        <div class="shift-review-suggest">${w.uncertain?'ตรวจเวลาเริ่ม–จบกับหัวหน้าเวรก่อนย้ายหรือหักชั่วโมง':w.alternatives.length?`วันว่างสำหรับพิจารณาสลับ: <b>${w.alternatives.map(fmtThaiDate).join(' หรือ ')}</b>`:'ไม่พบวันว่างอื่นในรอบนี้'}</div>
+      </div>`).join('')}</div>`:'<div class="shift-review-ok">ไม่พบรายการต้องตรวจจากข้อมูลที่โหลดไว้</div>')+
+      `<div class="shift-review-note">ไฟล์ LAB/Molec มีเพียงผลัด A–D ไม่ได้ระบุเวลาเริ่ม–จบ จึงไม่ยืนยันว่าเวรหลายแผนกเป็นชั่วโมงต่อเนื่อง และไม่ได้ย้ายเวรต้นฉบับอัตโนมัติ · การจัดตาราง HR A–H เป็นขั้นตอนแยกต่างหาก</div></div></details>`;
   }
   function cleanLabExtraSupport(list) {
     const out=[], seen=new Set();
@@ -3621,50 +3622,90 @@
       if(remainingTotal()<=0) break;
     }
 
-    // v2.50: สลับคนที่จัดแล้วเข้าเซลล์ว่างก่อนสรุปยอดคงค้าง
+    // v2.52: augmenting-path repair. Move multiple previously placed NORMAL claims
+    // with bounded backtracking instead of giving up after one swap.
+    // Locked LAB extra rows and 00000328 claims are never moved or duplicated.
     const slotLimit=c=>overflowPriority(c.date)<99?HR_DUMMY_ACTIVE_CAPACITY:HR_DUMMY_BASE_CAPACITY;
+    const byCode=new Map(totals.map(t=>[t.employeeCode,t]));
+    const cellKey=c=>`${c.date}|${c.slot}`;
+    const phaseFor=c=>cellOcc(c)>=HR_DUMMY_BASE_CAPACITY?(cellOcc(c)>=7?'H':'G'):'A-F';
     const removeRow=r=>{
-      const c=cells.find(c=>c.date===r.date&&c.slot===r.slot);
-      const i=rows.indexOf(r);if(i<0||!c)return false;
+      const c=cells.find(x=>x.date===r.date&&x.slot===r.slot);
+      const i=rows.indexOf(r);if(i<0||!c||!r.dummyPhase)return false;
       rows.splice(i,1);c.assigned--;
       remaining.set(r.employeeCode,(remaining.get(r.employeeCode)||0)+1);
       assigned.set(r.employeeCode,(assigned.get(r.employeeCode)||0)-1);
       daySlots(r.employeeCode,r.date).delete(r.slot);
       if(!daySlots(r.employeeCode,r.date).size)datesForStaff(r.employeeCode).delete(r.date);
-      const ex=existingFor(r.employeeCode);const j=ex.indexOf(r);if(j>=0)ex.splice(j,1);
+      const ex=existingFor(r.employeeCode),j=ex.indexOf(r);if(j>=0)ex.splice(j,1);
       return true;
     };
-    const eligibleCells=t=>cells.filter(c=>personCanUse(t,c)).sort((a,b)=>{
-      const pa=cellOcc(a)<HR_DUMMY_BASE_CAPACITY?0:overflowPriority(a.date)+1;
-      const pb=cellOcc(b)<HR_DUMMY_BASE_CAPACITY?0:overflowPriority(b.date)+1;
-      return pa-pb||a.date.localeCompare(b.date)||a.slot-b.slot;
-    });
-    let repairBudget=10000;
-    for(const t of [...totals].sort((a,b)=>(remaining.get(b.employeeCode)||0)-(remaining.get(a.employeeCode)||0))){
-      while((remaining.get(t.employeeCode)||0)>0&&repairBudget>0){
-        let fixed=false;
-        for(const c of eligibleCells(t)){
-          if(--repairBudget<=0)break;
-          if(cellOcc(c)<slotLimit(c)){
-            add(t,c,cellOcc(c)>=HR_DUMMY_BASE_CAPACITY?'G-H':'A-F');fixed=true;break;
-          }
-          const victims=rows.filter(r=>r.date===c.date&&r.slot===c.slot&&r.dummyPhase);
-          for(const victim of victims){
-            if(--repairBudget<=0)break;
-            const vt=totals.find(x=>x.employeeCode===victim.employeeCode);
-            if(!vt||!removeRow(victim))continue;
-            const alt=eligibleCells(vt).find(x=>x!==c&&cellOcc(x)<slotLimit(x));
-            if(alt && personCanUse(t,c) && cellOcc(c)<slotLimit(c)){
-              add(vt,alt,cellOcc(alt)>=HR_DUMMY_BASE_CAPACITY?'G-H':'A-F');
-              add(t,c,cellOcc(c)>=HR_DUMMY_BASE_CAPACITY?'G-H':'A-F');
-              fixed=true;break;
-            }
-            add(vt,c,victim.dummyPhase);
-          }
-          if(fixed)break;
+    const eligibleCells=(t,banned=new Set())=>cells.filter(c=>!banned.has(cellKey(c))&&personCanUse(t,c))
+      .sort((a,b)=>{
+        const pa=cellOcc(a)<HR_DUMMY_BASE_CAPACITY?0:overflowPriority(a.date)+1;
+        const pb=cellOcc(b)<HR_DUMMY_BASE_CAPACITY?0:overflowPriority(b.date)+1;
+        return pa-pb||cellOcc(a)-cellOcc(b)||a.date.localeCompare(b.date)||a.slot-b.slot;
+      });
+    let repairBudget=120000;
+    const relocate=(t,depth,banned,chain)=>{
+      if(repairBudget--<=0)return false;
+      const choices=eligibleCells(t,banned);
+      // Prefer a genuinely free cell before displacing anyone.
+      for(const c of choices){
+        if(cellOcc(c)<slotLimit(c)){
+          add(t,c,phaseFor(c));
+          return true;
         }
-        if(!fixed)break;
       }
+      if(depth<=0)return false;
+      for(const c of choices){
+        if(repairBudget<=0)break;
+        if(cellOcc(c)<slotLimit(c))continue;
+        const victims=rows.filter(r=>r.dummyPhase&&r.date===c.date&&r.slot===c.slot&&
+          !chain.has(r.employeeCode));
+        // Try movable claims with more alternatives first.
+        victims.sort((a,b)=>(remaining.get(b.employeeCode)||0)-(remaining.get(a.employeeCode)||0));
+        for(const victim of victims){
+          if(repairBudget--<=0)break;
+          const vt=byCode.get(victim.employeeCode);
+          if(!vt||!removeRow(victim))continue;
+          const nextChain=new Set(chain);nextChain.add(victim.employeeCode);
+          const nextBanned=new Set(banned);nextBanned.add(cellKey(c));
+          // Do not relocate into the vacancy that was just created.
+          if(relocate(vt,depth-1,nextBanned,nextChain)){
+            if(personCanUse(t,c)&&cellOcc(c)<slotLimit(c)){
+              add(t,c,phaseFor(c));
+              return true;
+            }
+            // Defensive invariant: this branch should be unreachable.
+          }
+          // Failed path: restore the displaced claim to its original cell.
+          // Nested unsuccessful paths restore themselves before returning.
+          if(personCanUse(vt,c)&&cellOcc(c)<slotLimit(c))add(vt,c,victim.dummyPhase);
+          else throw new Error('HR repair rollback failed; refuse to export inconsistent rows');
+        }
+      }
+      return false;
+    };
+    // Multiple passes: start with the hardest unmet personnel, and permit
+    // four-deep swap chains across dates and HR columns A–H.
+    for(let pass=0;pass<4&&remainingTotal()>0&&repairBudget>0;pass++){
+      let progress=false;
+      const pending=[...totals].sort((a,b)=>(remaining.get(b.employeeCode)||0)-(remaining.get(a.employeeCode)||0));
+      for(const t of pending){
+        while((remaining.get(t.employeeCode)||0)>0&&repairBudget>0){
+          if(!relocate(t,4,new Set(),new Set([t.employeeCode])))break;
+          progress=true;
+        }
+      }
+      if(!progress)break;
+    }
+    // Recompute deficit after repair; the earlier provisional count is stale.
+    weekdayBaseShortfalls.length=0;
+    for(const c of cells){
+      if(!isMonFri(c.date))continue;
+      const gap=Math.max(0,HR_DUMMY_BASE_CAPACITY-cellOcc(c));
+      if(gap)weekdayBaseShortfalls.push({date:c.date,slot:c.slot,gap});
     }
     totals.forEach(t=>{
       const claimedUnits=assigned.get(t.employeeCode)||0;
