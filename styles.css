@@ -1939,3 +1939,41 @@ input[type=email],input[type=password],input[type=number],input[type=date],selec
 .special328-unit-grid{display:flex;flex-wrap:wrap;gap:10px 18px;margin:9px 0}
 .special328-unit-grid label{display:inline-flex;align-items:center;gap:6px;font-weight:500}
 .special328-unit-choices small{display:block;opacity:.75}
+
+
+/* v2.54 — ตัดตรวจชั่วโมง OT และทำ UI กระชับขึ้น */
+body{font-size:14px;}
+.page-shell{gap:14px;padding-top:16px;padding-bottom:36px;}
+.topbar{padding:14px 18px;}
+.tabs{padding:0 10px 8px;gap:7px;}
+.tab{padding:10px 13px;border-radius:11px;}
+.card,.guide-card,.cycle-card{padding:16px 18px;border-radius:16px;}
+.section-head{margin-bottom:12px;}
+.workflow-step{width:34px;height:34px;font-size:18px;}
+.optional-summary{min-height:58px;padding:13px 16px;}
+.optional-summary b{font-size:16px;}
+.optional-body{padding:12px 16px 16px;}
+.lab-extra-form{gap:12px;}
+.new-staff-registration{margin-top:10px;}
+.result-panel{padding:14px 0 0;}
+.result-subsection{padding:0 0 16px;margin:0 0 16px;}
+.result-shell-head{padding-bottom:12px;}
+.result-search input[type=search]{height:38px;}
+.compact-pager{margin-top:8px;}
+.result-accordion{margin:0 0 14px;padding:0;border:1px solid #e3ebf1;border-radius:15px;background:#fbfdfe;overflow:hidden;}
+.result-accordion:last-child{margin-bottom:0;}
+.result-accordion > .result-accordion-summary{list-style:none;display:flex;align-items:center;justify-content:space-between;gap:12px;cursor:pointer;padding:13px 15px;background:#f7fafc;}
+.result-accordion > .result-accordion-summary::-webkit-details-marker{display:none;}
+.result-accordion > .result-accordion-summary::after{content:"⌄";font-size:18px;color:#698091;line-height:1;flex:0 0 auto;}
+.result-accordion[open] > .result-accordion-summary::after{content:"⌃";}
+.result-accordion-copy{display:flex;flex-direction:column;gap:2px;min-width:0;}
+.result-accordion-copy b{font-size:15px;color:#1f3850;}
+.result-accordion-copy span{font-size:12px;color:#6e8392;}
+.result-accordion-toggle-label{font-size:11px;color:#7f92a0;white-space:nowrap;}
+.result-accordion-body{padding:14px 15px 15px;border-top:1px solid #e7eef3;background:#fff;}
+.accordion-body-head{display:block;margin:0 0 10px;}
+.accordion-body-head p{margin:4px 0 0;}
+.result-accordion .table-wrap{margin-top:0;}
+.result-accordion .special328-unit-choices{margin-top:0;}
+@media(max-width:920px){.card,.guide-card,.cycle-card{padding:15px 16px;}.page-shell{gap:12px;}.result-accordion > .result-accordion-summary{padding:12px 14px;}.result-accordion-body{padding:13px 14px 14px;}}
+@media(max-width:560px){.topbar{padding:13px 12px;}.page-shell{padding:12px 10px 34px;gap:12px;}.card,.guide-card,.cycle-card{padding:14px;}.tabs{padding:0 6px 8px;}.tab{padding:9px 12px;}.result-accordion > .result-accordion-summary{align-items:flex-start;}.result-accordion-toggle-label{display:none;}.result-search{display:grid;grid-template-columns:1fr auto;}.result-search input[type=search]{width:100%;max-width:none;}}

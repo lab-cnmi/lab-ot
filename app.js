@@ -2872,7 +2872,8 @@
     if(badge) badge.textContent=`${rows.length} รายการ`;
     empty.hidden=rows.length>0;
     const details=$('labExtraDetails');
-    if(details && rows.length>0) details.open=true;
+    // v2.54: keep this optional panel compact; do not force it open after adding rows.
+    if(details && rows.length===0) details.open=false;
 
     table.innerHTML=rows.length?`<thead><tr>
       <th>วันที่</th><th>เวลา</th><th>ชื่อ</th><th>เวร LAB เดิม</th><th>การเบิกเพิ่มจากรายการนี้</th><th class="num">เงินเพิ่ม</th><th></th>

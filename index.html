@@ -1,668 +1,615 @@
 <!doctype html>
+<!DOCTYPE html>
+
 <html lang="th">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <meta name="theme-color" content="#f5f7fa" />
-  <meta name="apple-mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-  <meta name="apple-mobile-web-app-title" content="LAB OT" />
-  <link rel="manifest" href="manifest.webmanifest?v=20261008-27" />
-  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
-  <title>LAB OT — LAB / Molec / Bacteria</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=20261010-v253" />
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3EOT%3C/text%3E%3C/svg%3E">
-  <style>
+<meta charset="utf-8"/>
+<meta content="width=device-width,initial-scale=1" name="viewport"/>
+<meta content="#f5f7fa" name="theme-color"/>
+<meta content="yes" name="apple-mobile-web-app-capable"/>
+<meta content="default" name="apple-mobile-web-app-status-bar-style"/>
+<meta content="LAB OT" name="apple-mobile-web-app-title"/>
+<link href="manifest.webmanifest?v=20261010-v254" rel="manifest"/>
+<link href="icons/apple-touch-icon.png" rel="apple-touch-icon"/>
+<title>LAB OT — LAB / Molec / Bacteria</title>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="styles.css?v=20261010-v254" rel="stylesheet">
+<link href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3EOT%3C/text%3E%3C/svg%3E" rel="icon"/>
+<style>
     /* Critical: author CSS (.center-shell { display:grid }) must not override HTML hidden state */
     [hidden] { display: none !important; }
   </style>
-</head>
+</link></head>
 <body>
-  <div id="toast" class="toast" hidden></div>
-
-  <main id="setupView" class="center-shell" hidden>
-    <section class="auth-card">
-      <div class="brand-mark">OT</div>
-      <h1>LAB OT</h1>
-      <p>ระบบยังไม่ได้ตั้งค่า Supabase กรุณาแจ้ง Admin</p>
-      <button id="offlineDemoBtn" class="secondary-btn">ทดลองอ่าน Excel แบบไม่บันทึก</button>
-    </section>
-  </main>
-
-  <main id="authView" class="center-shell" hidden>
-    <section class="auth-card">
-      <div class="brand-mark">OT</div>
-      <h1>LAB OT</h1>
-      <p class="subtle">รวม OT ของ LAB, Molec และ Bacteria รอบ 16–15</p>
-      <form id="loginForm" class="stack">
-        <label>Mahidol ID / Email
+<div class="toast" hidden="" id="toast"></div>
+<main class="center-shell" hidden="" id="setupView">
+<section class="auth-card">
+<div class="brand-mark">OT</div>
+<h1>LAB OT</h1>
+<p>ระบบยังไม่ได้ตั้งค่า Supabase กรุณาแจ้ง Admin</p>
+<button class="secondary-btn" id="offlineDemoBtn">ทดลองอ่าน Excel แบบไม่บันทึก</button>
+</section>
+</main>
+<main class="center-shell" hidden="" id="authView">
+<section class="auth-card">
+<div class="brand-mark">OT</div>
+<h1>LAB OT</h1>
+<p class="subtle">รวม OT ของ LAB, Molec และ Bacteria รอบ 16–15</p>
+<form class="stack" id="loginForm">
+<label>Mahidol ID / Email
           <span class="email-suffix-field">
-            <input id="emailInput" type="text" autocomplete="username" inputmode="email" placeholder="username.sur" autocapitalize="none" spellcheck="false" required />
-            <span class="email-suffix">@mahidol.ac.th</span>
-          </span>
-        </label>
-        <label>รหัสผ่าน
-          <input id="passwordInput" type="password" autocomplete="current-password" required />
-        </label>
-        <button class="primary-btn" type="submit">เข้าสู่ระบบ</button>
-        <button id="installAppBtn" class="text-btn install-app-btn" type="button" hidden>ติดตั้ง LAB OT เป็นแอป</button>
-      </form>
-      <p id="loginError" class="error-text" hidden></p>
-    </section>
-  </main>
-
-  <div id="appView" hidden>
-    <header class="topbar">
-      <div>
-        <div class="eyebrow">LAB OT · LAB / MOLEC / BACTERIA</div>
-        <h1>สรุป OT รอบ 16–15</h1>
-      </div>
-      <div class="topbar-actions">
-        <span id="loginBadge" class="user-badge"></span>
-        <label id="adminRoleSwitchWrap" class="role-switch">
-          <span class="sr-only">Role</span>
-          <select id="adminRoleSwitch" aria-label="Role">
-            <option value="admin">Admin</option>
-            <option value="staff">Staff</option>
-          </select>
-        </label>
-        <button id="changePasswordBtn" class="ghost-btn">เปลี่ยนรหัสผ่าน</button>
-        <button id="logoutBtn" class="ghost-btn">ออกจากระบบ</button>
-      </div>
-    </header>
-
-    <nav class="tabs" aria-label="เมนูหลัก">
-      <button class="tab active" data-tab="work">ทำ OT รอบนี้</button>
-      <button class="tab" data-tab="history">รอบที่บันทึกไว้</button>
-      <button class="tab" data-tab="myack">OT ของฉัน</button>
-      <button class="tab" data-tab="users" data-admin-only>ผู้ใช้งาน</button>
-      <button class="tab" data-tab="log">Log ล่าสุดของแอพ</button>
-      <button class="tab" data-tab="guide">วิธีใช้</button>
-    </nav>
-    <main class="page-shell">
-      <section id="tab-work" class="tab-panel active">
-        <section class="cycle-card">
-          <div>
-            <div class="section-kicker">รอบ OT</div>
-            <h2 id="cycleTitle">-</h2>
-            <p>เช่น รอบ ก.ย. = 16 ส.ค. – 15 ก.ย.</p>
-          </div>
-          <div class="cycle-controls">
-            <label>รอบเดือน
+<input autocapitalize="none" autocomplete="username" id="emailInput" inputmode="email" placeholder="username.sur" required="" spellcheck="false" type="text"/>
+<span class="email-suffix">@mahidol.ac.th</span>
+</span>
+</label>
+<label>รหัสผ่าน
+          <input autocomplete="current-password" id="passwordInput" required="" type="password"/>
+</label>
+<button class="primary-btn" type="submit">เข้าสู่ระบบ</button>
+<button class="text-btn install-app-btn" hidden="" id="installAppBtn" type="button">ติดตั้ง LAB OT เป็นแอป</button>
+</form>
+<p class="error-text" hidden="" id="loginError"></p>
+</section>
+</main>
+<div hidden="" id="appView">
+<header class="topbar">
+<div>
+<div class="eyebrow">LAB OT · LAB / MOLEC / BACTERIA</div>
+<h1>สรุป OT รอบ 16–15</h1>
+</div>
+<div class="topbar-actions">
+<span class="user-badge" id="loginBadge"></span>
+<label class="role-switch" id="adminRoleSwitchWrap">
+<span class="sr-only">Role</span>
+<select aria-label="Role" id="adminRoleSwitch">
+<option value="admin">Admin</option>
+<option value="staff">Staff</option>
+</select>
+</label>
+<button class="ghost-btn" id="changePasswordBtn">เปลี่ยนรหัสผ่าน</button>
+<button class="ghost-btn" id="logoutBtn">ออกจากระบบ</button>
+</div>
+</header>
+<nav aria-label="เมนูหลัก" class="tabs">
+<button class="tab active" data-tab="work">ทำ OT รอบนี้</button>
+<button class="tab" data-tab="history">รอบที่บันทึกไว้</button>
+<button class="tab" data-tab="myack">OT ของฉัน</button>
+<button class="tab" data-admin-only="" data-tab="users">ผู้ใช้งาน</button>
+<button class="tab" data-tab="log">Log ล่าสุดของแอพ</button>
+<button class="tab" data-tab="guide">วิธีใช้</button>
+</nav>
+<main class="page-shell">
+<section class="tab-panel active" id="tab-work">
+<section class="cycle-card">
+<div>
+<div class="section-kicker">รอบ OT</div>
+<h2 id="cycleTitle">-</h2>
+<p>เช่น รอบ ก.ย. = 16 ส.ค. – 15 ก.ย.</p>
+</div>
+<div class="cycle-controls">
+<label>รอบเดือน
               <select id="cycleMonth"></select>
-            </label>
-            <label>ปี พ.ศ.
-              <input id="cycleYear" type="number" min="2560" max="2600" step="1" />
-            </label>
-            <button id="currentCycleBtn" class="secondary-btn compact">รอบปัจจุบัน</button>
-          </div>
-        </section>
-        <section id="roundHolidayCard" class="card day-settings-card">
-          <div class="section-head workflow-head">
-            <div class="workflow-title">
-              <span class="workflow-step">1</span>
-              <h2>ตั้งค่าวัน</h2>
-            </div>
-          </div>
-
-          <div class="day-settings-grid">
-            <div class="day-setting-box">
-              <div class="day-setting-title">
-                <b>วันหยุด</b>
-              </div>
-
-              <div class="day-setting-row weekend-row">
-                <span class="field-label">เสาร์–อาทิตย์</span>
-                <div id="weekendDateList" class="date-chip-list compact-chip-list"></div>
-              </div>
-
-              <div class="day-setting-row">
-                <span class="field-label">วันหยุดนักขัตฤกษ์</span>
-                <div class="inline-date-controls">
-                  <input id="manualHolidayDatePicker" type="date" aria-label="วันหยุดนักขัตฤกษ์" />
-                  <button id="addManualHolidayDateBtn" class="secondary-btn compact" type="button">เพิ่ม</button>
-                  <button id="saveManualHolidayDatesBtn" class="primary-btn compact" type="button">บันทึก</button>
-                </div>
-                <div id="manualHolidayDateList" class="date-chip-list compact-chip-list"></div>
-              </div>
-            </div>
-
-            <div id="special328Card" class="day-setting-box special328-inline">
-              <div class="day-setting-title">
-                <b>สิทธิ์ 00000328</b>
-              </div>
-              <div class="day-setting-row">
-                <span class="field-label">วันที่ HR ประกาศ</span>
-                <div class="inline-date-controls">
-                  <input id="special328DatePicker" type="date" aria-label="วันที่สิทธิ์ 00000328" />
-                  <button id="addSpecial328DateBtn" class="secondary-btn compact" type="button">เพิ่ม</button>
-                  <button id="saveSpecial328DatesBtn" class="primary-btn compact" type="button">บันทึก</button>
-                </div>
-                <div id="special328DateList" class="date-chip-list compact-chip-list"></div>
-                <span id="special328Status" class="compact-inline-status">ยังไม่ได้เพิ่มวันที่</span>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <section class="card">
-          <div class="section-head workflow-head">
-            <div class="workflow-title">
-              <span class="workflow-step">2</span>
-              <h2>เลือกไฟล์เวร 3 หน่วย</h2>
-            </div>
-            <span id="unitReadyBadge" class="pill">0 / 3 หน่วย</span>
-          </div>
-          <div class="unit-upload-grid">
-            <article class="unit-upload">
-              <div class="unit-head"><span class="unit-dot lab"></span><b>LAB</b></div>
-              <p class="unit-hint">เวร A–D</p>
-              <input id="labFile" type="file" accept=".xlsx,.xls" />
-              <div id="labStatus" class="file-status">ยังไม่ได้เลือกไฟล์</div>
-            </article>
-            <article class="unit-upload">
-              <div class="unit-head"><span class="unit-dot molec"></span><b>Molec</b></div>
-              <p class="unit-hint">เวรแบบ LAB</p>
-              <input id="molecFile" type="file" accept=".xlsx,.xls" />
-              <div id="molecStatus" class="file-status">ยังไม่ได้เลือกไฟล์</div>
-            </article>
-            <article class="unit-upload">
-              <div class="unit-head"><span class="unit-dot bact"></span><b>Bacteria</b></div>
-              <p class="unit-hint">H1/H2/H3 · Extra · บ่าย · ดึก</p>
-              <input id="bacteriaFile" type="file" accept=".xlsx,.xls" />
-              <div id="bacteriaStatus" class="file-status">ยังไม่ได้เลือกไฟล์</div>
-            </article>
-          </div>
-        </section>
-
-        <details id="labExtraDetails" class="card optional-details lab-extra-card">
-          <summary class="optional-summary">
-            <div class="workflow-title">
-              <span class="workflow-step muted-step">3</span>
-              <div>
-                <b>OT LAB ช่วยเพิ่ม</b>
-                <span class="optional-tag">ถ้ามี</span>
-              </div>
-            </div>
-            <span id="labExtraCountBadge" class="pill">0 รายการ</span>
-          </summary>
-
-          <div class="optional-body">
-            <div class="lab-extra-form">
-              <label>วันที่
-                <input id="labExtraDate" type="date" />
-              </label>
-              <label>เวลาที่มาช่วย
+</label>
+<label>ปี พ.ศ.
+              <input id="cycleYear" max="2600" min="2560" step="1" type="number"/>
+</label>
+<button class="secondary-btn compact" id="currentCycleBtn">รอบปัจจุบัน</button>
+</div>
+</section>
+<section class="card day-settings-card" id="roundHolidayCard">
+<div class="section-head workflow-head">
+<div class="workflow-title">
+<span class="workflow-step">1</span>
+<h2>ตั้งค่าวัน</h2>
+</div>
+</div>
+<div class="day-settings-grid">
+<div class="day-setting-box">
+<div class="day-setting-title">
+<b>วันหยุด</b>
+</div>
+<div class="day-setting-row weekend-row">
+<span class="field-label">เสาร์–อาทิตย์</span>
+<div class="date-chip-list compact-chip-list" id="weekendDateList"></div>
+</div>
+<div class="day-setting-row">
+<span class="field-label">วันหยุดนักขัตฤกษ์</span>
+<div class="inline-date-controls">
+<input aria-label="วันหยุดนักขัตฤกษ์" id="manualHolidayDatePicker" type="date"/>
+<button class="secondary-btn compact" id="addManualHolidayDateBtn" type="button">เพิ่ม</button>
+<button class="primary-btn compact" id="saveManualHolidayDatesBtn" type="button">บันทึก</button>
+</div>
+<div class="date-chip-list compact-chip-list" id="manualHolidayDateList"></div>
+</div>
+</div>
+<div class="day-setting-box special328-inline" id="special328Card">
+<div class="day-setting-title">
+<b>สิทธิ์ 00000328</b>
+</div>
+<div class="day-setting-row">
+<span class="field-label">วันที่ HR ประกาศ</span>
+<div class="inline-date-controls">
+<input aria-label="วันที่สิทธิ์ 00000328" id="special328DatePicker" type="date"/>
+<button class="secondary-btn compact" id="addSpecial328DateBtn" type="button">เพิ่ม</button>
+<button class="primary-btn compact" id="saveSpecial328DatesBtn" type="button">บันทึก</button>
+</div>
+<div class="date-chip-list compact-chip-list" id="special328DateList"></div>
+<span class="compact-inline-status" id="special328Status">ยังไม่ได้เพิ่มวันที่</span>
+</div>
+</div>
+</div>
+</section>
+<section class="card">
+<div class="section-head workflow-head">
+<div class="workflow-title">
+<span class="workflow-step">2</span>
+<h2>เลือกไฟล์เวร 3 หน่วย</h2>
+</div>
+<span class="pill" id="unitReadyBadge">0 / 3 หน่วย</span>
+</div>
+<div class="unit-upload-grid">
+<article class="unit-upload">
+<div class="unit-head"><span class="unit-dot lab"></span><b>LAB</b></div>
+<p class="unit-hint">เวร A–D</p>
+<input accept=".xlsx,.xls" id="labFile" type="file"/>
+<div class="file-status" id="labStatus">ยังไม่ได้เลือกไฟล์</div>
+</article>
+<article class="unit-upload">
+<div class="unit-head"><span class="unit-dot molec"></span><b>Molec</b></div>
+<p class="unit-hint">เวรแบบ LAB</p>
+<input accept=".xlsx,.xls" id="molecFile" type="file"/>
+<div class="file-status" id="molecStatus">ยังไม่ได้เลือกไฟล์</div>
+</article>
+<article class="unit-upload">
+<div class="unit-head"><span class="unit-dot bact"></span><b>Bacteria</b></div>
+<p class="unit-hint">H1/H2/H3 · Extra · บ่าย · ดึก</p>
+<input accept=".xlsx,.xls" id="bacteriaFile" type="file"/>
+<div class="file-status" id="bacteriaStatus">ยังไม่ได้เลือกไฟล์</div>
+</article>
+</div>
+</section>
+<details class="card optional-details lab-extra-card" id="labExtraDetails">
+<summary class="optional-summary">
+<div class="workflow-title">
+<span class="workflow-step muted-step">3</span>
+<div>
+<b>OT LAB ช่วยเพิ่ม</b>
+<span class="optional-tag">ถ้ามี</span>
+</div>
+</div>
+<span class="pill" id="labExtraCountBadge">0 รายการ</span>
+</summary>
+<div class="optional-body">
+<div class="lab-extra-form">
+<label>วันที่
+                <input id="labExtraDate" type="date"/>
+</label>
+<label>เวลาที่มาช่วย
                 <select id="labExtraSlot">
-                  <option value="8" selected>08:00–16:00</option>
-                  <option value="0">00:00–08:00</option>
-                  <option value="16">16:00–00:00</option>
-                </select>
-              </label>
-              <div class="lab-helper-picker" id="labExtraPickerWrap">
-                <span class="lab-helper-picker-label">ผู้มาช่วย</span>
-                <button id="labExtraPickerBtn" class="lab-helper-picker-button" type="button" aria-expanded="false">
-                  <span>เลือกผู้มาช่วย</span>
-                  <span id="labExtraSelectedCount" class="lab-helper-count">0 คน</span>
-                </button>
-                <div id="labExtraSelectedSummary" class="lab-helper-selected-summary">ยังไม่ได้เลือก</div>
+<option selected="" value="8">08:00–16:00</option>
+<option value="0">00:00–08:00</option>
+<option value="16">16:00–00:00</option>
+</select>
+</label>
+<div class="lab-helper-picker" id="labExtraPickerWrap">
+<span class="lab-helper-picker-label">ผู้มาช่วย</span>
+<button aria-expanded="false" class="lab-helper-picker-button" id="labExtraPickerBtn" type="button">
+<span>เลือกผู้มาช่วย</span>
+<span class="lab-helper-count" id="labExtraSelectedCount">0 คน</span>
+</button>
+<div class="lab-helper-selected-summary" id="labExtraSelectedSummary">ยังไม่ได้เลือก</div>
+<div class="lab-helper-picker-panel" hidden="" id="labExtraPickerPanel">
+<div class="lab-helper-picker-tools">
+<input autocomplete="off" id="labExtraStaffSearch" placeholder="ค้นหาชื่อ ชื่อเล่น หรือรหัสพนักงาน" type="search"/>
+<button class="ghost-btn compact" id="labExtraClearSelectionBtn" type="button">ล้างที่เลือก</button>
+</div>
+<div class="lab-helper-staff-list" id="labExtraStaffList"></div>
+</div>
+</div>
+<div class="lab-extra-actions">
+<button class="secondary-btn" disabled="" id="addLabExtraBtn" type="button">เพิ่มรายการ</button>
+<button class="primary-btn" id="saveLabExtraBtn" type="button">บันทึก</button>
+</div>
+</div>
+<details class="new-staff-registration"><summary>+ เพิ่มบุคลากรใหม่ (ยังไม่มีชื่อในตารางเวร)</summary>
+<div class="new-staff-fields"><label>ชื่อ-นามสกุล <input id="labNewStaffName" placeholder="น.ส. ภาณินี มงคลสุข"/></label>
+<label>รหัสพนักงาน 7 หลัก <input id="labNewStaffCode" inputmode="numeric" maxlength="7" placeholder="กรอกรหัสจริง"/></label>
+<button class="secondary-btn" id="labNewStaffBtn" type="button">เพิ่มชื่อ</button></div>
+<p class="subtle">ต้องใช้รหัสพนักงานจริงเพื่อป้องกันการเบิกผิดคน · เพิ่มแล้วเลือกชื่อในรายการผู้มาช่วย และกดบันทึก</p>
+</details>
 
-                <div id="labExtraPickerPanel" class="lab-helper-picker-panel" hidden>
-                  <div class="lab-helper-picker-tools">
-                    <input id="labExtraStaffSearch" type="search" placeholder="ค้นหาชื่อ ชื่อเล่น หรือรหัสพนักงาน" autocomplete="off" />
-                    <button id="labExtraClearSelectionBtn" class="ghost-btn compact" type="button">ล้างที่เลือก</button>
-                  </div>
-                  <div id="labExtraStaffList" class="lab-helper-staff-list"></div>
-                </div>
-              </div>
-              <div class="lab-extra-actions">
-                <button id="addLabExtraBtn" class="secondary-btn" type="button" disabled>เพิ่มรายการ</button>
-                <button id="saveLabExtraBtn" class="primary-btn" type="button">บันทึก</button>
-              </div>
-            </div>
+<div class="form-error" hidden="" id="labExtraError"></div>
+<div class="empty-state compact-empty" id="labExtraEmpty">ยังไม่มีรายการ</div>
+<div class="table-wrap compact-table-wrap"><table id="labExtraTable"></table></div>
+</div>
+</details>
+<section class="card sync-card">
+<div class="step-no">4</div>
+<div class="sync-copy">
+<h2>ดึงวันลา</h2>
+<div class="file-status" id="calendarStatus">อัปตารางเวรให้ครบ 3 หน่วยก่อน</div>
+<div class="sync-meta" hidden="" id="calendarSyncMeta"></div>
+</div>
+<button class="secondary-btn" disabled="" id="syncCalendarBtn">ดึงวันลาล่าสุด</button>
+</section>
+<section hidden="" id="resultArea">
+<section class="card result-shell-card">
+<div class="result-shell-head">
+<div>
+<div class="section-kicker">ผลรอบนี้</div>
+<h2>สรุปและตรวจสอบ OT</h2>
+</div>
+<div class="actions result-main-actions">
+<button class="secondary-btn" disabled="" id="exportBtn">Export HR Excel</button>
+<button class="primary-btn" disabled="" id="saveBtn">ยืนยันและบันทึกรอบนี้</button>
+</div>
+</div>
+<div class="summary-grid five compact-result-metrics">
+<div class="metric"><span>รอบ OT</span><b id="cycleMetric">-</b></div>
+<div class="metric"><span>จำนวนคน</span><b id="staffMetric">0</b></div>
+<div class="metric"><span>รายการเวร</span><b id="assignmentMetric">0</b></div>
+<div class="metric"><span>OT รวม</span><b id="hoursMetric">0 ชม.</b></div>
+<div class="metric warn"><span>เตือนวันลา</span><b id="conflictMetric">0</b></div>
+</div>
+<nav aria-label="ผลรอบนี้" class="result-tabs">
+<button class="result-tab active" data-result-tab="summary" type="button">สรุป OT</button>
+<button class="result-tab" data-result-tab="ack" type="button">รับทราบ OT <span class="mini-badge" id="resultAckBadge">0/0</span></button>
+<button class="result-tab" data-result-tab="leave" type="button">วันลา <span class="mini-badge" id="resultLeaveBadge">0</span></button>
+<button class="result-tab" data-result-tab="validation" type="button">ตรวจไฟล์</button>
+</nav>
+<div class="result-panel active" id="result-panel-summary">
+<section class="result-subsection">
+<div class="section-head compact-section-head">
+<div><h2>สรุป OT รายคน</h2></div>
+<div class="result-search">
+<input id="summarySearchInput" placeholder="ค้นหาชื่อเจ้าหน้าที่" type="search"/>
+<button class="secondary-btn compact" id="clearSummarySearchBtn" type="button">ล้าง</button>
+</div>
+</div>
+<div class="result-list-meta" id="summaryResultMeta"></div>
+<div class="table-wrap"><table id="summaryTable"></table></div>
+<div class="compact-pager" id="summaryPager"></div>
+</section>
+<details class="result-subsection result-accordion"><summary class="result-accordion-summary"><span class="result-accordion-copy"><b>สรุปตามหน่วย</b><span>เปิดเมื่อต้องการดูยอดแยกตามหน่วย</span></span><span class="result-accordion-toggle-label">แตะเพื่อเปิด/ปิด</span></summary><div class="result-accordion-body">
 
-            <details class="new-staff-registration"><summary>+ เพิ่มบุคลากรใหม่ (ยังไม่มีชื่อในตารางเวร)</summary>
-              <div class="new-staff-fields"><label>ชื่อ-นามสกุล <input id="labNewStaffName" placeholder="น.ส. ภาณินี มงคลสุข" /></label>
-              <label>รหัสพนักงาน 7 หลัก <input id="labNewStaffCode" inputmode="numeric" maxlength="7" placeholder="กรอกรหัสจริง" /></label>
-              <button type="button" id="labNewStaffBtn" class="secondary-btn">เพิ่มชื่อ</button></div>
-              <p class="subtle">ต้องใช้รหัสพนักงานจริงเพื่อป้องกันการเบิกผิดคน · เพิ่มแล้วเลือกชื่อในรายการผู้มาช่วย และกดบันทึก</p>
-            </details>
-            <div id="labShiftReview" class="lab-shift-review"></div>
-            <div id="labExtraError" class="form-error" hidden></div>
-            <div id="labExtraEmpty" class="empty-state compact-empty">ยังไม่มีรายการ</div>
-            <div class="table-wrap compact-table-wrap"><table id="labExtraTable"></table></div>
-          </div>
-        </details>
+<div class="table-wrap"><table id="unitSummaryTable"></table></div>
+</div></details>
+<details class="result-subsection special328-eligibility result-accordion" hidden="" id="special328EligibilityCard"><summary class="result-accordion-summary"><span class="result-accordion-copy"><b>ตรวจสิทธิ์ 00000328</b><span>เปิดเมื่อจำเป็นต้องตรวจหรือปรับสิทธิ์</span></span><span class="result-accordion-toggle-label">แตะเพื่อเปิด/ปิด</span></summary><div class="result-accordion-body">
 
-        <section class="card sync-card">
-          <div class="step-no">4</div>
-          <div class="sync-copy">
-            <h2>ดึงวันลา</h2>
-            
-            <div id="calendarStatus" class="file-status">อัปตารางเวรให้ครบ 3 หน่วยก่อน</div>
-            <div id="calendarSyncMeta" class="sync-meta" hidden></div>
-          </div>
-          <button id="syncCalendarBtn" class="secondary-btn" disabled>ดึงวันลาล่าสุด</button>
-        </section>
+<div class="special328-unit-choices" id="special328UnitChoices"><b>คำนวณ 00000328 เพิ่มเฉพาะแผนกที่ยังไม่ได้รวมยอดมา</b><div class="special328-unit-grid"><label><input checked="" data-special328-unit="LAB" type="checkbox"/> LAB คำนวณเพิ่ม</label><label><input checked="" data-special328-unit="Molec" type="checkbox"/> Molec คำนวณเพิ่ม</label><label><input checked="" data-special328-unit="Bacteria" type="checkbox"/> Bacteria คำนวณเพิ่ม</label></div><small>เอาติ๊กออกหากแผนกรวมสิทธิ์มาแล้ว · ปรับรายคนต่อได้ด้านล่าง · กดบันทึกวันที่ 00000328 เพื่อบันทึกตัวเลือก</small></div>
+<div class="empty-state" id="special328EligibilityEmpty">ยังไม่มีข้อมูล</div>
+<div class="table-wrap"><table id="special328EligibilityTable"></table></div>
+</div></details>
+</div>
+<div class="result-panel" id="result-panel-ack">
+<section class="result-subsection ack-manager-card" hidden="" id="ackManagerCard">
+<div class="section-head">
+<div>
+<h2>รับทราบ OT <span class="pill" id="ackProgressBadge">0 / 0 คน</span></h2>
+</div>
+<div class="actions">
+<button class="secondary-btn" id="refreshAckBtn" type="button">รีเฟรช</button>
+<button class="secondary-btn" disabled="" id="exportAckEvidenceBtn" type="button">Export หลักฐาน</button>
+<button class="primary-btn" id="saveAckEmailsBtn" type="button">บันทึก Mahidol ID</button>
+</div>
+</div>
+<div class="result-search result-search-left">
+<input id="ackSearchInput" placeholder="ค้นหาชื่อเจ้าหน้าที่" type="search"/>
+<button class="secondary-btn compact" id="clearAckSearchBtn" type="button">ล้าง</button>
+</div>
+<p class="notice-inline" hidden="" id="ackManagerNote"></p>
+<div class="result-list-meta" id="ackResultMeta"></div>
+<div class="table-wrap"><table id="ackManagerTable"></table></div>
+<div class="compact-pager" id="ackPager"></div>
+</section>
+</div>
+<div class="result-panel" id="result-panel-leave">
+<section class="result-subsection">
+<div class="section-head compact-section-head">
+<div>
+<h2>เวรที่ตรงกับวันลา</h2>
+</div>
+</div>
+<div class="empty-state" id="conflictEmpty">ยังไม่ได้ดึงวันลา</div>
+<div class="table-wrap"><table id="conflictTable"></table></div>
+<div class="compact-pager" id="conflictPager"></div>
+</section>
+<details class="result-subsection all-leave-card result-accordion"><summary class="result-accordion-summary"><span class="result-accordion-copy"><b>วันลาทั้งหมด</b><span>เปิดเมื่ออยากดูรายการวันลาทั้งหมด</span></span><span class="result-accordion-toggle-label">แตะเพื่อเปิด/ปิด</span></summary><div class="result-accordion-body"><div class="section-head compact-section-head accordion-body-head"><div>
 
-        <section id="resultArea" hidden>
-          <section class="card result-shell-card">
-            <div class="result-shell-head">
-              <div>
-                <div class="section-kicker">ผลรอบนี้</div>
-                <h2>สรุปและตรวจสอบ OT</h2>
-              </div>
-              <div class="actions result-main-actions">
-                <button id="exportBtn" class="secondary-btn" disabled>Export HR Excel</button>
-                <button id="saveBtn" class="primary-btn" disabled>ยืนยันและบันทึกรอบนี้</button>
-              </div>
-            </div>
+<p class="leave-source-summary" id="leaveSourceSummary"></p>
+</div></div>
 
-            <div class="summary-grid five compact-result-metrics">
-              <div class="metric"><span>รอบ OT</span><b id="cycleMetric">-</b></div>
-              <div class="metric"><span>จำนวนคน</span><b id="staffMetric">0</b></div>
-              <div class="metric"><span>รายการเวร</span><b id="assignmentMetric">0</b></div>
-              <div class="metric"><span>OT รวม</span><b id="hoursMetric">0 ชม.</b></div>
-              <div class="metric warn"><span>เตือนวันลา</span><b id="conflictMetric">0</b></div>
-            </div>
-
-            <nav class="result-tabs" aria-label="ผลรอบนี้">
-              <button class="result-tab active" type="button" data-result-tab="summary">สรุป OT</button>
-              <button class="result-tab" type="button" data-result-tab="ack">รับทราบ OT <span id="resultAckBadge" class="mini-badge">0/0</span></button>
-              <button class="result-tab" type="button" data-result-tab="leave">วันลา <span id="resultLeaveBadge" class="mini-badge">0</span></button>
-              <button class="result-tab" type="button" data-result-tab="validation">ตรวจไฟล์</button>
-            </nav>
-
-            <div id="result-panel-summary" class="result-panel active">
-              <section class="result-subsection">
-                <div class="section-head compact-section-head">
-                  <div><h2>สรุป OT รายคน</h2></div>
-                  <div class="result-search">
-                    <input id="summarySearchInput" type="search" placeholder="ค้นหาชื่อเจ้าหน้าที่">
-                    <button id="clearSummarySearchBtn" class="secondary-btn compact" type="button">ล้าง</button>
-                  </div>
-                </div>
-                <div id="summaryResultMeta" class="result-list-meta"></div>
-                <div class="table-wrap"><table id="summaryTable"></table></div>
-                <div id="summaryPager" class="compact-pager"></div>
-              </section>
-
-              <section class="result-subsection">
-                <div class="section-head compact-section-head"><div><h2>สรุปตามหน่วย</h2></div></div>
-                <div class="table-wrap"><table id="unitSummaryTable"></table></div>
-              </section>
-
-              <section id="special328EligibilityCard" class="result-subsection special328-eligibility" hidden>
-                <div class="section-head compact-section-head">
-                  <div><h2>ตรวจสิทธิ์ 00000328</h2></div>
-                </div>
-                <div id="special328UnitChoices" class="special328-unit-choices"><b>คำนวณ 00000328 เพิ่มเฉพาะแผนกที่ยังไม่ได้รวมยอดมา</b><div class="special328-unit-grid"><label><input type="checkbox" data-special328-unit="LAB" checked> LAB คำนวณเพิ่ม</label><label><input type="checkbox" data-special328-unit="Molec" checked> Molec คำนวณเพิ่ม</label><label><input type="checkbox" data-special328-unit="Bacteria" checked> Bacteria คำนวณเพิ่ม</label></div><small>เอาติ๊กออกหากแผนกรวมสิทธิ์มาแล้ว · ปรับรายคนต่อได้ด้านล่าง · กดบันทึกวันที่ 00000328 เพื่อบันทึกตัวเลือก</small></div>
-                <div id="special328EligibilityEmpty" class="empty-state">ยังไม่มีข้อมูล</div>
-                <div class="table-wrap"><table id="special328EligibilityTable"></table></div>
-              </section>
-            </div>
-
-            <div id="result-panel-ack" class="result-panel">
-              <section id="ackManagerCard" class="result-subsection ack-manager-card" hidden>
-                <div class="section-head">
-                  <div>
-                    <h2>รับทราบ OT <span id="ackProgressBadge" class="pill">0 / 0 คน</span></h2>
-                  </div>
-                  <div class="actions">
-                    <button id="refreshAckBtn" class="secondary-btn" type="button">รีเฟรช</button>
-                    <button id="exportAckEvidenceBtn" class="secondary-btn" type="button" disabled>Export หลักฐาน</button>
-                    <button id="saveAckEmailsBtn" class="primary-btn" type="button">บันทึก Mahidol ID</button>
-                  </div>
-                </div>
-                <div class="result-search result-search-left">
-                  <input id="ackSearchInput" type="search" placeholder="ค้นหาชื่อเจ้าหน้าที่">
-                  <button id="clearAckSearchBtn" class="secondary-btn compact" type="button">ล้าง</button>
-                </div>
-                <p id="ackManagerNote" class="notice-inline" hidden></p>
-                <div id="ackResultMeta" class="result-list-meta"></div>
-                <div class="table-wrap"><table id="ackManagerTable"></table></div>
-                <div id="ackPager" class="compact-pager"></div>
-              </section>
-            </div>
-
-            <div id="result-panel-leave" class="result-panel">
-              <section class="result-subsection">
-                <div class="section-head compact-section-head">
-                  <div>
-                    <h2>เวรที่ตรงกับวันลา</h2>
-                  </div>
-                </div>
-                <div id="conflictEmpty" class="empty-state">ยังไม่ได้ดึงวันลา</div>
-                <div class="table-wrap"><table id="conflictTable"></table></div>
-                <div id="conflictPager" class="compact-pager"></div>
-              </section>
-
-              <section class="result-subsection all-leave-card">
-                <div class="section-head compact-section-head">
-                  <div>
-                    <h2>วันลาทั้งหมด <span class="count-badge"><span id="leaveCountBadge">0</span> รายการ</span></h2>
-                    <p id="leaveSourceSummary" class="leave-source-summary"></p>
-                  </div>
-                </div>
-                <div id="allLeaveEmpty" class="empty-state">ยังไม่ได้ดึงวันลา</div>
-                <div class="table-wrap"><table id="allLeaveTable"></table></div>
-                <div id="leavePager" class="compact-pager"></div>
-              </section>
-            </div>
-
-            <div id="result-panel-validation" class="result-panel">
-              <section class="result-subsection">
-                <div class="section-head compact-section-head"><div><h2>ตรวจไฟล์</h2></div></div>
-                <div id="validationQuick" class="validation-quick"></div>
-                <details class="validation-details">
-                  <summary>ดูรายละเอียดการตรวจไฟล์</summary>
-                  <div id="validationList" class="validation-list"></div>
-                </details>
-              </section>
-            </div>
-          </section>
-        </section>
-      </section>
-
-      <section id="tab-history" class="tab-panel">
-        <section class="card">
-          <div class="section-head"><div><h2>รอบที่บันทึกไว้</h2></div><button id="refreshHistoryBtn" class="secondary-btn">รีเฟรช</button></div>
-          <div id="historyList" class="history-list"></div>
-        </section>
-      </section>
-
-
-      <section id="tab-myack" class="tab-panel">
-        <section class="card">
-          <div class="section-head">
-            <div>
-              <h2>OT ของฉัน</h2>
-              <p>ตรวจรายละเอียดแล้วกดยืนยันรับทราบได้เหมือนเจ้าหน้าที่ทุกคน</p>
-            </div>
-            <div class="admin-ack-search-row">
-              <label class="ack-round-filter">
-                <span>รอบเดือน</span>
-                <select id="adminAckCycleFilter"><option value="">กำลังโหลด…</option></select>
-              </label>
-              <label class="ack-round-filter admin-staff-filter">
-                <span>เจ้าหน้าที่</span>
-                <select id="adminAckStaffFilter">
-                  <option value="">เลือกเจ้าหน้าที่</option>
-                </select>
-              </label>
-              <button id="searchAdminAckStaffBtn" class="primary-btn compact admin-filter-btn" type="button">ค้นหา</button>
-              <button id="clearAdminAckStaffBtn" class="secondary-btn compact admin-filter-btn" type="button">ล้างค่า</button>
-            </div>
-          </div>
-          <div id="myAckEmpty" class="empty-state">กำลังโหลดรายการ…</div>
-          <div id="managerAckList" class="ack-list"></div>
-        </section>
-
-        <section id="ownerStaffPreviewCard" class="card owner-preview-card" hidden>
-          <div class="section-head">
-            <div>
-              <h2>OT ของเจ้าหน้าที่ทุกคน</h2>
-            </div>
-            <button id="refreshOwnerPreviewBtn" class="secondary-btn" type="button">รีเฟรช</button>
-          </div>
-
-          <div id="ownerStaffPreviewDetail" class="owner-preview-detail owner-preview-detail-top">
-            <h3 id="ownerStaffPreviewTitle">เลือกเจ้าหน้าที่เพื่อดู OT</h3>
-            <div id="ownerStaffPreviewDetailEmpty" class="empty-state">เลือกเจ้าหน้าที่ด้านล่างเพื่อดู OT</div>
-            <div id="ownerStaffPreviewList" class="ack-list owner-preview-list"></div>
-          </div>
-
-          <div id="ownerStaffPreviewEmpty" class="empty-state">เลือกเจ้าหน้าที่ด้านบน แล้วกดค้นหา</div>
-        </section>
-      </section>
-
-      <section id="tab-users" class="tab-panel" data-admin-only>
-        <section class="card user-admin-card">
-          <div class="section-head">
-            <div>
-              <h2>เพิ่มผู้ใช้งาน</h2>
-              <p>เพิ่มและจัดการบัญชีเจ้าหน้าที่ในหน่วย</p>
-            </div>
-          </div>
-          <form id="newUserForm" class="new-user-grid">
-            <label>ชื่อ-สกุล
-              <input id="newUserDisplayName" type="text" placeholder="พิมพ์ชื่อ นามสกุล" autocomplete="off" required>
-            </label>
-            <label>รหัสพนักงาน
-              <input id="newUserEmployeeCode" type="text" placeholder="เช่น 0021415" inputmode="numeric" maxlength="7" autocomplete="off" required>
-            </label>
-            <label>Mahidol ID
+<div class="empty-state" id="allLeaveEmpty">ยังไม่ได้ดึงวันลา</div>
+<div class="table-wrap"><table id="allLeaveTable"></table></div>
+<div class="compact-pager" id="leavePager"></div>
+</div></details>
+</div>
+<div class="result-panel" id="result-panel-validation">
+<section class="result-subsection">
+<div class="section-head compact-section-head"><div><h2>ตรวจไฟล์</h2></div></div>
+<div class="validation-quick" id="validationQuick"></div>
+<details class="validation-details">
+<summary>ดูรายละเอียดการตรวจไฟล์</summary>
+<div class="validation-list" id="validationList"></div>
+</details>
+</section>
+</div>
+</section>
+</section>
+</section>
+<section class="tab-panel" id="tab-history">
+<section class="card">
+<div class="section-head"><div><h2>รอบที่บันทึกไว้</h2></div><button class="secondary-btn" id="refreshHistoryBtn">รีเฟรช</button></div>
+<div class="history-list" id="historyList"></div>
+</section>
+</section>
+<section class="tab-panel" id="tab-myack">
+<section class="card">
+<div class="section-head">
+<div>
+<h2>OT ของฉัน</h2>
+<p>ตรวจรายละเอียดแล้วกดยืนยันรับทราบได้เหมือนเจ้าหน้าที่ทุกคน</p>
+</div>
+<div class="admin-ack-search-row">
+<label class="ack-round-filter">
+<span>รอบเดือน</span>
+<select id="adminAckCycleFilter"><option value="">กำลังโหลด…</option></select>
+</label>
+<label class="ack-round-filter admin-staff-filter">
+<span>เจ้าหน้าที่</span>
+<select id="adminAckStaffFilter">
+<option value="">เลือกเจ้าหน้าที่</option>
+</select>
+</label>
+<button class="primary-btn compact admin-filter-btn" id="searchAdminAckStaffBtn" type="button">ค้นหา</button>
+<button class="secondary-btn compact admin-filter-btn" id="clearAdminAckStaffBtn" type="button">ล้างค่า</button>
+</div>
+</div>
+<div class="empty-state" id="myAckEmpty">กำลังโหลดรายการ…</div>
+<div class="ack-list" id="managerAckList"></div>
+</section>
+<section class="card owner-preview-card" hidden="" id="ownerStaffPreviewCard">
+<div class="section-head">
+<div>
+<h2>OT ของเจ้าหน้าที่ทุกคน</h2>
+</div>
+<button class="secondary-btn" id="refreshOwnerPreviewBtn" type="button">รีเฟรช</button>
+</div>
+<div class="owner-preview-detail owner-preview-detail-top" id="ownerStaffPreviewDetail">
+<h3 id="ownerStaffPreviewTitle">เลือกเจ้าหน้าที่เพื่อดู OT</h3>
+<div class="empty-state" id="ownerStaffPreviewDetailEmpty">เลือกเจ้าหน้าที่ด้านล่างเพื่อดู OT</div>
+<div class="ack-list owner-preview-list" id="ownerStaffPreviewList"></div>
+</div>
+<div class="empty-state" id="ownerStaffPreviewEmpty">เลือกเจ้าหน้าที่ด้านบน แล้วกดค้นหา</div>
+</section>
+</section>
+<section class="tab-panel" data-admin-only="" id="tab-users">
+<section class="card user-admin-card">
+<div class="section-head">
+<div>
+<h2>เพิ่มผู้ใช้งาน</h2>
+<p>เพิ่มและจัดการบัญชีเจ้าหน้าที่ในหน่วย</p>
+</div>
+</div>
+<form class="new-user-grid" id="newUserForm">
+<label>ชื่อ-สกุล
+              <input autocomplete="off" id="newUserDisplayName" placeholder="พิมพ์ชื่อ นามสกุล" required="" type="text"/>
+</label>
+<label>รหัสพนักงาน
+              <input autocomplete="off" id="newUserEmployeeCode" inputmode="numeric" maxlength="7" placeholder="เช่น 0021415" required="" type="text"/>
+</label>
+<label>Mahidol ID
               <span class="email-suffix-field">
-                <input id="newUserUsername" type="text" placeholder="username.sur" autocapitalize="none" spellcheck="false" required>
-                <span class="email-suffix">@mahidol.ac.th</span>
-              </span>
-            </label>
-            <label>ตำแหน่ง
-              <input id="newUserPosition" type="text" placeholder="เช่น นักเทคนิคการแพทย์">
-            </label>
-            <label>Role
+<input autocapitalize="none" id="newUserUsername" placeholder="username.sur" required="" spellcheck="false" type="text"/>
+<span class="email-suffix">@mahidol.ac.th</span>
+</span>
+</label>
+<label>ตำแหน่ง
+              <input id="newUserPosition" placeholder="เช่น นักเทคนิคการแพทย์" type="text"/>
+</label>
+<label>Role
               <select id="newUserRole">
-                <option value="staff" selected>Staff</option>
-                <option value="admin">Admin</option>
-              </select>
-            </label>
-            <label>รหัสผ่านชั่วคราว
-              <input id="newUserPassword" type="password" minlength="8" placeholder="อย่างน้อย 8 ตัวอักษร" required>
-            </label>
-            <label class="create-active-label">Active
+<option selected="" value="staff">Staff</option>
+<option value="admin">Admin</option>
+</select>
+</label>
+<label>รหัสผ่านชั่วคราว
+              <input id="newUserPassword" minlength="8" placeholder="อย่างน้อย 8 ตัวอักษร" required="" type="password"/>
+</label>
+<label class="create-active-label">Active
               <span class="active-toggle create-active-toggle">
-                <input id="newUserActive" type="checkbox" checked>
-                <span>Active</span>
-              </span>
-            </label>
-            <button id="createUserBtn" class="primary-btn" type="submit">สร้างบัญชี</button>
-          </form>
-          <p id="newUserError" class="error-text" hidden></p>
-        </section>
-
-        <section class="card">
-          <div class="section-head">
-            <div><h2>รายชื่อผู้ใช้งาน</h2></div>
-            <button class="secondary-btn" type="button" onclick="void 0" id="reloadManagedUsersBtn">รีเฟรช</button>
-          </div>
-          <div id="managedUsersEmpty" class="empty-state">กำลังโหลดรายชื่อ…</div>
-          <div class="table-wrap"><table id="managedUsersTable"></table></div>
-        </section>
-      </section>
-
-      <section id="tab-log" class="tab-panel">
-        <section class="card">
-          <div class="section-head">
-            <div>
-              <h2>Log ล่าสุดของแอพ</h2>
-            </div>
-            <button id="refreshAdminLogBtn" class="secondary-btn" type="button">รีเฟรช</button>
-          </div>
-          <div id="adminLogEmpty" class="empty-state">กำลังโหลด…</div>
-          <div class="table-wrap"><table id="adminLogTable"></table></div>
-        </section>
-      </section>
-
-      <section id="tab-guide" class="tab-panel">
-        <section class="guide-card simple-guide">
-          <h2>วิธีใช้</h2>
-
-          <h3>สำหรับผู้ทำรอบ OT</h3>
-          <ol class="guide-steps">
-            <li><b>เลือกรอบเดือน</b><span>เช่น รอบเดือนกันยายน คือวันที่ 16 สิงหาคม ถึง 15 กันยายน</span></li>
-            <li><b>ตรวจวันหยุดรอบนี้</b><span>เสาร์–อาทิตย์ระบบแสดงให้อัตโนมัติ ถ้ามีวันหยุดนักขัตฤกษ์ให้เพิ่มวันที่ก่อนอ่านตาราง</span></li>
-            <li><b>เลือกไฟล์เวรให้ครบ 3 หน่วย</b><span>เลือก LAB, Molec และ Bacteria ของรอบนั้น</span></li>
-            <li><b>ใส่ OT LAB ช่วยเพิ่ม ถ้ามี</b><span>เลือกวันที่ เวลา และติ๊กชื่อผู้มาช่วยได้หลายคน</span></li>
-            <li><b>ใส่วันที่ 00000328 ถ้ามี</b><span>ใส่เฉพาะวันที่ HR แจ้งช่วงปีใหม่หรือสงกรานต์ ถ้าเดือนไหนไม่มีให้ข้าม</span></li>
-            <li><b>ดึงวันลา</b><span>ตรวจจำนวนวันลาที่ดึงมา และดูว่ามีรายการใดตรงกับเวรหรือไม่</span></li>
-            <li><b>ตรวจสรุป OT</b><span>เช็กชื่อ ชั่วโมง และรายการเตือนให้เรียบร้อย</span></li>
-            <li><b>บันทึกรอบ</b><span>เมื่อข้อมูลถูกต้องแล้ว กด “ยืนยันและบันทึกรอบนี้”</span></li>
-            <li><b>ติดตามการรับทราบ</b><span>ดูหัวข้อ “รับทราบ OT” ว่าใครรับทราบแล้วและใครยังค้างอยู่</span></li>
-            <li><b>ดู Log ล่าสุดของแอพ</b><span>ใช้ตรวจการเข้าใช้ การรับทราบ และการทำรายการของผู้ใช้งานในระบบ</span></li>
-            <li><b>Export</b><span>Export HR Excel และ Export หลักฐานการรับทราบเมื่อพร้อมส่งงาน</span></li>
-          </ol>
-
-          <h3>เพิ่มบัญชีเจ้าหน้าที่ครั้งแรก</h3>
-          <ol class="guide-steps">
-            <li><b>เปิดเมนู “ผู้ใช้งาน”</b><span>เลือกชื่อเจ้าหน้าที่ ใส่ Mahidol ID และรหัสผ่านชั่วคราว</span></li>
-            <li><b>กด “สร้างบัญชี”</b><span>แจ้ง Mahidol ID และรหัสชั่วคราวให้เจ้าหน้าที่คนนั้น</span></li>
-            <li><b>ครั้งแรกที่เข้าใช้</b><span>ระบบจะให้เจ้าหน้าที่ตั้งรหัสผ่านใหม่ของตนเองก่อนใช้งาน</span></li>
-            <li><b>ลืมรหัสผ่าน</b><span>กด “Reset password” ที่รายชื่อผู้ใช้งาน แล้วตั้งรหัสชั่วคราวใหม่ให้เจ้าหน้าที่</span></li>
-          </ol>
-
-          <h3>สำหรับเจ้าหน้าที่รับทราบ OT</h3>
-          <ol class="guide-steps">
-            <li><b>เข้าสู่ระบบ</b><span>กรอกเฉพาะ Mahidol ID เช่น username.sur และรหัสผ่าน</span></li>
-            <li><b>เปิดรอบ OT</b><span>ดูยอด OT และเปิดรายละเอียดเวรของตนเอง</span></li>
-            <li><b>ตรวจข้อมูล</b><span>ถ้าข้อมูลถูกต้อง ให้ติ๊กข้อความรับทราบ</span></li>
-            <li><b>กด “ยืนยันรับทราบ”</b><span>เมื่อบันทึกแล้วจะแสดงวันและเวลาที่รับทราบ</span></li>
-            <li><b>ถ้ารายการถูกแก้ภายหลัง</b><span>ระบบจะให้รับทราบใหม่เฉพาะรอบที่ข้อมูลของคุณเปลี่ยน</span></li>
-          </ol>
-
-          <h3>ติดตั้งบนมือถือ</h3>
-          <div class="mobile-guide-grid">
-            <div><b>Android</b><span>เปิด LAB OT ด้วย Chrome → เลือก “ติดตั้งแอป” หรือ “เพิ่มไปยังหน้าจอหลัก”</span></div>
-            <div><b>iPhone / iPad</b><span>เปิด LAB OT ด้วย Safari → กด Share → “เพิ่มไปยังหน้าจอโฮม” → เพิ่ม</span></div>
-          </div>
-        </section>
-      </section>
-    </main>
-  </div>
-
-
-
-  <main id="ackView" class="ack-view" hidden>
-    <header class="topbar ack-topbar">
-      <div>
-        <div class="eyebrow">LAB OT</div>
-        <h1>OT ของฉัน</h1>
-      </div>
-      <div class="topbar-actions">
-        <span id="ackLoginBadge" class="user-badge"></span>
-        <label id="ackRoleSwitchWrap" class="role-switch" hidden>
-          <span class="sr-only">Role</span>
-          <select id="ackRoleSwitch" aria-label="Role">
-            <option value="admin">Admin</option>
-            <option value="staff" selected>Staff</option>
-          </select>
-        </label>
-        <button id="ackInstallAppBtn" class="ghost-btn" type="button" hidden>ติดตั้งแอป</button>
-        <button id="ackChangePasswordBtn" class="ghost-btn" type="button">เปลี่ยนรหัสผ่าน</button>
-        <button id="ackLogoutBtn" class="ghost-btn" type="button">ออกจากระบบ</button>
-      </div>
-    </header>
-
-    <nav class="tabs staff-tabs" aria-label="เมนูเจ้าหน้าที่">
-      <button class="tab staff-tab active" data-staff-tab="myack" aria-selected="true">OT ของฉัน</button>
-      <button class="tab staff-tab" data-staff-tab="guide" aria-selected="false">วิธีใช้</button>
-      <button class="tab staff-tab" data-staff-tab="log" aria-selected="false">Log ล่าสุดของแอพ</button>
-    </nav>
-
-    <main class="ack-page-shell staff-page-shell">
-      <section id="staff-tab-myack" class="staff-tab-panel active">
-        <div class="staff-ack-filter-row">
-          <label class="ack-round-filter">
-            <span>รอบเดือน</span>
-            <select id="staffAckCycleFilter"><option value="">กำลังโหลด…</option></select>
-          </label>
-        </div>
-        <div id="ackEmpty" class="empty-state">กำลังโหลดรายการ…</div>
-        <section id="ackList" class="ack-list"></section>
-      </section>
-
-      <section id="staff-tab-guide" class="staff-tab-panel">
-        <section class="guide-card simple-guide staff-guide">
-          <h2>วิธีใช้</h2>
-          <ol class="guide-steps">
-            <li><b>เปิด “OT ของฉัน”</b><span>เลือกดูรอบ OT และเปิดรายละเอียดเวรของตนเอง</span></li>
-            <li><b>ตรวจเวรจริง</b><span>เช็กวันที่ หน่วย เวร เวลา และจำนวนชั่วโมงของตนเอง</span></li>
-            <li><b>ตรวจตารางเบิก HR</b><span>ดูวันที่ เวลาเข้า-ออก และวันที่ระบบเว้น รวมถึงวันลาที่ระบบใช้หลบ</span></li>
-            <li><b>กดยืนยันรับทราบ</b><span>เมื่อเวรจริง ตารางเบิก HR และวันที่ระบบเว้นถูกต้องแล้ว จึงติ๊กและกด “ยืนยันรับทราบ”</span></li>
-            <li><b>ถ้าข้อมูลถูกแก้ภายหลัง</b><span>ระบบจะให้รับทราบใหม่เฉพาะรอบที่ข้อมูลของคุณเปลี่ยน</span></li>
-            <li><b>เปลี่ยนรหัสผ่าน</b><span>กดปุ่ม “เปลี่ยนรหัสผ่าน” ด้านบนได้ตลอด</span></li>
-          </ol>
-          <h3>ติดตั้งบนมือถือ</h3>
-          <div class="mobile-guide-grid">
-            <div><b>Android</b><span>เปิดด้วย Chrome → เลือก “ติดตั้งแอป” หรือ “เพิ่มไปยังหน้าจอหลัก”</span></div>
-            <div><b>iPhone / iPad</b><span>เปิดด้วย Safari → กด Share → “เพิ่มไปยังหน้าจอโฮม”</span></div>
-          </div>
-        </section>
-      </section>
-
-      <section id="staff-tab-log" class="staff-tab-panel">
-        <section class="card">
-          <div class="section-head">
-            <div><h2>Log ล่าสุดของแอพ</h2></div>
-            <button id="refreshStaffLogBtn" class="secondary-btn" type="button">รีเฟรช</button>
-          </div>
-          <div id="staffLogEmpty" class="empty-state">กำลังโหลด…</div>
-          <div class="table-wrap"><table id="staffLogTable"></table></div>
-        </section>
-      </section>
-    </main>
-  </main>
-
-  <div id="adminResetPasswordModal" class="modal-backdrop" hidden>
-    <section class="modal-card password-modal" role="dialog" aria-modal="true" aria-labelledby="adminResetPasswordTitle">
-      <div class="modal-head">
-        <div>
-          <h2 id="adminResetPasswordTitle">Reset password</h2>
-          <p id="resetUserEmail"></p>
-        </div>
-        <button id="adminResetPasswordCloseBtn" class="icon-btn" type="button" aria-label="ปิด">×</button>
-      </div>
-      <form id="adminResetPasswordForm" class="stack">
-        <label>รหัสผ่านชั่วคราวใหม่
-          <input id="adminTempPassword" type="password" minlength="8" required>
-        </label>
-        <label>ยืนยันรหัสผ่านชั่วคราว
-          <input id="adminTempPasswordConfirm" type="password" minlength="8" required>
-        </label>
-        <p id="adminResetPasswordError" class="error-text" hidden></p>
-        <div class="modal-actions">
-          <button id="adminResetPasswordCancelBtn" class="ghost-btn" type="button">ยกเลิก</button>
-          <button id="adminResetPasswordSaveBtn" class="primary-btn" type="submit">บันทึกรหัสชั่วคราว</button>
-        </div>
-      </form>
-    </section>
-  </div>
-
-  <div id="passwordModal" class="modal-backdrop" hidden>
-    <section class="modal-card password-modal" role="dialog" aria-modal="true" aria-labelledby="passwordModalTitle">
-      <div class="modal-head">
-        <div>
-          <h2 id="passwordModalTitle">เปลี่ยนรหัสผ่าน</h2>
-          <p id="passwordModalHelper">เปลี่ยนรหัสผ่านของบัญชีนี้</p>
-        </div>
-        <button id="closePasswordModalBtn" class="icon-btn" type="button" aria-label="ปิด">×</button>
-      </div>
-
-      <form id="passwordChangeForm" class="stack">
-        <label>รหัสผ่านเดิม
-          <input id="currentPasswordInput" type="password" autocomplete="current-password" required />
-        </label>
-        <label>รหัสผ่านใหม่
-          <input id="newPasswordInput" type="password" autocomplete="new-password" minlength="8" required />
-        </label>
-        <label>ยืนยันรหัสผ่านใหม่
-          <input id="confirmPasswordInput" type="password" autocomplete="new-password" minlength="8" required />
-        </label>
-        <p id="passwordChangeError" class="error-text" hidden></p>
-        <div class="modal-actions">
-          <button id="cancelPasswordBtn" class="ghost-btn" type="button">ยกเลิก</button>
-          <button id="savePasswordBtn" class="primary-btn" type="submit">บันทึกรหัสใหม่</button>
-        </div>
-      </form>
-    </section>
-  </div>
-
-
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-  <script>
+<input checked="" id="newUserActive" type="checkbox"/>
+<span>Active</span>
+</span>
+</label>
+<button class="primary-btn" id="createUserBtn" type="submit">สร้างบัญชี</button>
+</form>
+<p class="error-text" hidden="" id="newUserError"></p>
+</section>
+<section class="card">
+<div class="section-head">
+<div><h2>รายชื่อผู้ใช้งาน</h2></div>
+<button class="secondary-btn" id="reloadManagedUsersBtn" onclick="void 0" type="button">รีเฟรช</button>
+</div>
+<div class="empty-state" id="managedUsersEmpty">กำลังโหลดรายชื่อ…</div>
+<div class="table-wrap"><table id="managedUsersTable"></table></div>
+</section>
+</section>
+<section class="tab-panel" id="tab-log">
+<section class="card">
+<div class="section-head">
+<div>
+<h2>Log ล่าสุดของแอพ</h2>
+</div>
+<button class="secondary-btn" id="refreshAdminLogBtn" type="button">รีเฟรช</button>
+</div>
+<div class="empty-state" id="adminLogEmpty">กำลังโหลด…</div>
+<div class="table-wrap"><table id="adminLogTable"></table></div>
+</section>
+</section>
+<section class="tab-panel" id="tab-guide">
+<section class="guide-card simple-guide">
+<h2>วิธีใช้</h2>
+<h3>สำหรับผู้ทำรอบ OT</h3>
+<ol class="guide-steps">
+<li><b>เลือกรอบเดือน</b><span>เช่น รอบเดือนกันยายน คือวันที่ 16 สิงหาคม ถึง 15 กันยายน</span></li>
+<li><b>ตรวจวันหยุดรอบนี้</b><span>เสาร์–อาทิตย์ระบบแสดงให้อัตโนมัติ ถ้ามีวันหยุดนักขัตฤกษ์ให้เพิ่มวันที่ก่อนอ่านตาราง</span></li>
+<li><b>เลือกไฟล์เวรให้ครบ 3 หน่วย</b><span>เลือก LAB, Molec และ Bacteria ของรอบนั้น</span></li>
+<li><b>ใส่ OT LAB ช่วยเพิ่ม ถ้ามี</b><span>เลือกวันที่ เวลา และติ๊กชื่อผู้มาช่วยได้หลายคน</span></li>
+<li><b>ใส่วันที่ 00000328 ถ้ามี</b><span>ใส่เฉพาะวันที่ HR แจ้งช่วงปีใหม่หรือสงกรานต์ ถ้าเดือนไหนไม่มีให้ข้าม</span></li>
+<li><b>ดึงวันลา</b><span>ตรวจจำนวนวันลาที่ดึงมา และดูว่ามีรายการใดตรงกับเวรหรือไม่</span></li>
+<li><b>ตรวจสรุป OT</b><span>เช็กชื่อ ชั่วโมง และรายการเตือนให้เรียบร้อย</span></li>
+<li><b>บันทึกรอบ</b><span>เมื่อข้อมูลถูกต้องแล้ว กด “ยืนยันและบันทึกรอบนี้”</span></li>
+<li><b>ติดตามการรับทราบ</b><span>ดูหัวข้อ “รับทราบ OT” ว่าใครรับทราบแล้วและใครยังค้างอยู่</span></li>
+<li><b>ดู Log ล่าสุดของแอพ</b><span>ใช้ตรวจการเข้าใช้ การรับทราบ และการทำรายการของผู้ใช้งานในระบบ</span></li>
+<li><b>Export</b><span>Export HR Excel และ Export หลักฐานการรับทราบเมื่อพร้อมส่งงาน</span></li>
+</ol>
+<h3>เพิ่มบัญชีเจ้าหน้าที่ครั้งแรก</h3>
+<ol class="guide-steps">
+<li><b>เปิดเมนู “ผู้ใช้งาน”</b><span>เลือกชื่อเจ้าหน้าที่ ใส่ Mahidol ID และรหัสผ่านชั่วคราว</span></li>
+<li><b>กด “สร้างบัญชี”</b><span>แจ้ง Mahidol ID และรหัสชั่วคราวให้เจ้าหน้าที่คนนั้น</span></li>
+<li><b>ครั้งแรกที่เข้าใช้</b><span>ระบบจะให้เจ้าหน้าที่ตั้งรหัสผ่านใหม่ของตนเองก่อนใช้งาน</span></li>
+<li><b>ลืมรหัสผ่าน</b><span>กด “Reset password” ที่รายชื่อผู้ใช้งาน แล้วตั้งรหัสชั่วคราวใหม่ให้เจ้าหน้าที่</span></li>
+</ol>
+<h3>สำหรับเจ้าหน้าที่รับทราบ OT</h3>
+<ol class="guide-steps">
+<li><b>เข้าสู่ระบบ</b><span>กรอกเฉพาะ Mahidol ID เช่น username.sur และรหัสผ่าน</span></li>
+<li><b>เปิดรอบ OT</b><span>ดูยอด OT และเปิดรายละเอียดเวรของตนเอง</span></li>
+<li><b>ตรวจข้อมูล</b><span>ถ้าข้อมูลถูกต้อง ให้ติ๊กข้อความรับทราบ</span></li>
+<li><b>กด “ยืนยันรับทราบ”</b><span>เมื่อบันทึกแล้วจะแสดงวันและเวลาที่รับทราบ</span></li>
+<li><b>ถ้ารายการถูกแก้ภายหลัง</b><span>ระบบจะให้รับทราบใหม่เฉพาะรอบที่ข้อมูลของคุณเปลี่ยน</span></li>
+</ol>
+<h3>ติดตั้งบนมือถือ</h3>
+<div class="mobile-guide-grid">
+<div><b>Android</b><span>เปิด LAB OT ด้วย Chrome → เลือก “ติดตั้งแอป” หรือ “เพิ่มไปยังหน้าจอหลัก”</span></div>
+<div><b>iPhone / iPad</b><span>เปิด LAB OT ด้วย Safari → กด Share → “เพิ่มไปยังหน้าจอโฮม” → เพิ่ม</span></div>
+</div>
+</section>
+</section>
+</main>
+</div>
+<main class="ack-view" hidden="" id="ackView">
+<header class="topbar ack-topbar">
+<div>
+<div class="eyebrow">LAB OT</div>
+<h1>OT ของฉัน</h1>
+</div>
+<div class="topbar-actions">
+<span class="user-badge" id="ackLoginBadge"></span>
+<label class="role-switch" hidden="" id="ackRoleSwitchWrap">
+<span class="sr-only">Role</span>
+<select aria-label="Role" id="ackRoleSwitch">
+<option value="admin">Admin</option>
+<option selected="" value="staff">Staff</option>
+</select>
+</label>
+<button class="ghost-btn" hidden="" id="ackInstallAppBtn" type="button">ติดตั้งแอป</button>
+<button class="ghost-btn" id="ackChangePasswordBtn" type="button">เปลี่ยนรหัสผ่าน</button>
+<button class="ghost-btn" id="ackLogoutBtn" type="button">ออกจากระบบ</button>
+</div>
+</header>
+<nav aria-label="เมนูเจ้าหน้าที่" class="tabs staff-tabs">
+<button aria-selected="true" class="tab staff-tab active" data-staff-tab="myack">OT ของฉัน</button>
+<button aria-selected="false" class="tab staff-tab" data-staff-tab="guide">วิธีใช้</button>
+<button aria-selected="false" class="tab staff-tab" data-staff-tab="log">Log ล่าสุดของแอพ</button>
+</nav>
+<main class="ack-page-shell staff-page-shell">
+<section class="staff-tab-panel active" id="staff-tab-myack">
+<div class="staff-ack-filter-row">
+<label class="ack-round-filter">
+<span>รอบเดือน</span>
+<select id="staffAckCycleFilter"><option value="">กำลังโหลด…</option></select>
+</label>
+</div>
+<div class="empty-state" id="ackEmpty">กำลังโหลดรายการ…</div>
+<section class="ack-list" id="ackList"></section>
+</section>
+<section class="staff-tab-panel" id="staff-tab-guide">
+<section class="guide-card simple-guide staff-guide">
+<h2>วิธีใช้</h2>
+<ol class="guide-steps">
+<li><b>เปิด “OT ของฉัน”</b><span>เลือกดูรอบ OT และเปิดรายละเอียดเวรของตนเอง</span></li>
+<li><b>ตรวจเวรจริง</b><span>เช็กวันที่ หน่วย เวร เวลา และจำนวนชั่วโมงของตนเอง</span></li>
+<li><b>ตรวจตารางเบิก HR</b><span>ดูวันที่ เวลาเข้า-ออก และวันที่ระบบเว้น รวมถึงวันลาที่ระบบใช้หลบ</span></li>
+<li><b>กดยืนยันรับทราบ</b><span>เมื่อเวรจริง ตารางเบิก HR และวันที่ระบบเว้นถูกต้องแล้ว จึงติ๊กและกด “ยืนยันรับทราบ”</span></li>
+<li><b>ถ้าข้อมูลถูกแก้ภายหลัง</b><span>ระบบจะให้รับทราบใหม่เฉพาะรอบที่ข้อมูลของคุณเปลี่ยน</span></li>
+<li><b>เปลี่ยนรหัสผ่าน</b><span>กดปุ่ม “เปลี่ยนรหัสผ่าน” ด้านบนได้ตลอด</span></li>
+</ol>
+<h3>ติดตั้งบนมือถือ</h3>
+<div class="mobile-guide-grid">
+<div><b>Android</b><span>เปิดด้วย Chrome → เลือก “ติดตั้งแอป” หรือ “เพิ่มไปยังหน้าจอหลัก”</span></div>
+<div><b>iPhone / iPad</b><span>เปิดด้วย Safari → กด Share → “เพิ่มไปยังหน้าจอโฮม”</span></div>
+</div>
+</section>
+</section>
+<section class="staff-tab-panel" id="staff-tab-log">
+<section class="card">
+<div class="section-head">
+<div><h2>Log ล่าสุดของแอพ</h2></div>
+<button class="secondary-btn" id="refreshStaffLogBtn" type="button">รีเฟรช</button>
+</div>
+<div class="empty-state" id="staffLogEmpty">กำลังโหลด…</div>
+<div class="table-wrap"><table id="staffLogTable"></table></div>
+</section>
+</section>
+</main>
+</main>
+<div class="modal-backdrop" hidden="" id="adminResetPasswordModal">
+<section aria-labelledby="adminResetPasswordTitle" aria-modal="true" class="modal-card password-modal" role="dialog">
+<div class="modal-head">
+<div>
+<h2 id="adminResetPasswordTitle">Reset password</h2>
+<p id="resetUserEmail"></p>
+</div>
+<button aria-label="ปิด" class="icon-btn" id="adminResetPasswordCloseBtn" type="button">×</button>
+</div>
+<form class="stack" id="adminResetPasswordForm">
+<label>รหัสผ่านชั่วคราวใหม่
+          <input id="adminTempPassword" minlength="8" required="" type="password"/>
+</label>
+<label>ยืนยันรหัสผ่านชั่วคราว
+          <input id="adminTempPasswordConfirm" minlength="8" required="" type="password"/>
+</label>
+<p class="error-text" hidden="" id="adminResetPasswordError"></p>
+<div class="modal-actions">
+<button class="ghost-btn" id="adminResetPasswordCancelBtn" type="button">ยกเลิก</button>
+<button class="primary-btn" id="adminResetPasswordSaveBtn" type="submit">บันทึกรหัสชั่วคราว</button>
+</div>
+</form>
+</section>
+</div>
+<div class="modal-backdrop" hidden="" id="passwordModal">
+<section aria-labelledby="passwordModalTitle" aria-modal="true" class="modal-card password-modal" role="dialog">
+<div class="modal-head">
+<div>
+<h2 id="passwordModalTitle">เปลี่ยนรหัสผ่าน</h2>
+<p id="passwordModalHelper">เปลี่ยนรหัสผ่านของบัญชีนี้</p>
+</div>
+<button aria-label="ปิด" class="icon-btn" id="closePasswordModalBtn" type="button">×</button>
+</div>
+<form class="stack" id="passwordChangeForm">
+<label>รหัสผ่านเดิม
+          <input autocomplete="current-password" id="currentPasswordInput" required="" type="password">
+</input></label>
+<label>รหัสผ่านใหม่
+          <input autocomplete="new-password" id="newPasswordInput" minlength="8" required="" type="password">
+</input></label>
+<label>ยืนยันรหัสผ่านใหม่
+          <input autocomplete="new-password" id="confirmPasswordInput" minlength="8" required="" type="password">
+</input></label>
+<p class="error-text" hidden="" id="passwordChangeError"></p>
+<div class="modal-actions">
+<button class="ghost-btn" id="cancelPasswordBtn" type="button">ยกเลิก</button>
+<button class="primary-btn" id="savePasswordBtn" type="submit">บันทึกรหัสใหม่</button>
+</div>
+</form>
+</section>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script>
     window.LAB_OT_CONFIG = {
       SUPABASE_URL: 'https://xjbwuyhdpsmfimzaradu.supabase.co',
       SUPABASE_KEY: 'sb_publishable_yyLkUtatgoov6hR50VeLHQ_P8WGFZ-G',
@@ -673,12 +620,11 @@
     };
     window.PSC_OT_CONFIG = window.LAB_OT_CONFIG;
   </script>
-  <script src="app.js?v=20261010-v253"></script>
-  <script>
+<script src="app.js?v=20261010-v254"></script>
+<script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(console.warn));
     }
   </script>
-
 </body>
 </html>
