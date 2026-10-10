@@ -1,9 +1,9 @@
-const CACHE_NAME = 'lab-ot-shell-v249';
+const CACHE_NAME = 'lab-ot-shell-v250';
 const SHELL = [
   './',
   './index.html',
-  './styles.css?v=20261008-v248',
-  './app.js?v=20261008-48',
+  './styles.css?v=20261010-v250',
+  './app.js?v=20261010-v250',
   './manifest.webmanifest?v=20261008-27',
   './icons/icon-192.png',
   './icons/icon-512.png',

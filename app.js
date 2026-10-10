@@ -41,6 +41,7 @@
     manualHolidayDates: [],
     special328Dates: [],
     special328Selected: {},
+    special328Units: {LAB:true,Molec:true,Bacteria:true},
     labExtraSupport: [],
     customStaff: [],
     ackPeople: {},
@@ -1415,6 +1416,12 @@
     $('addSpecial328DateBtn')?.addEventListener('click', addSpecial328DateFromPicker);
     $('saveSpecial328DatesBtn')?.addEventListener('click', saveSpecial328Dates);
     $('special328DatePicker')?.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); addSpecial328DateFromPicker(); } });
+    $('special328UnitChoices')?.addEventListener('change', e => {
+      const cb=e.target.closest('[data-special328-unit]');
+      if(!cb) return;
+      state.special328Units[cb.dataset.special328Unit]=!!cb.checked;
+      renderSpecial328Eligibility();
+    });
     $('special328EligibilityTable')?.addEventListener('change', e => {
       const cb = e.target.closest('[data-special328-code]');
       if (!cb) return;
@@ -2986,6 +2993,7 @@
     resetLabExtraPicker(true);
     state.special328Dates = [];
     state.special328Selected = {};
+    state.special328Units = {LAB:true,Molec:true,Bacteria:true};
     renderRoundHolidaySettings();
     renderLabExtraSupport();
     renderSpecial328Dates();
@@ -3015,6 +3023,7 @@
         ? { ...payload.special328Selected }
         : {};
 
+    state.special328Units={LAB:true,Molec:true,Bacteria:true,...(payload.special328Units||{})};
     renderRoundHolidaySettings();
     renderLabExtraSupport();
     renderSpecial328Dates();
@@ -3072,6 +3081,7 @@
       cycle:{...state.cycle},
       special328Dates:[...state.special328Dates],
       special328Selected:{...state.special328Selected},
+      special328Units:{...state.special328Units},
       special328UpdatedAt:new Date().toISOString(),
       special328UpdatedBy:String(state.session?.user?.email||'')
     };
@@ -3119,6 +3129,7 @@
 
     for(const a of assignments){
       if(!dateSet.has(a.date)) continue;
+      if(state.special328Units?.[a.unit]===false) continue;
       const staff=hrStaff(a.name);
       if(!staff) continue;
 
@@ -3158,9 +3169,7 @@
       .sort((a,b)=>a.nick.localeCompare(b.nick,'th'));
 
     const validCodes=new Set(rows.map(x=>x.employeeCode));
-    for(const k of Object.keys(state.special328Selected||{})){
-      if(!validCodes.has(k)) delete state.special328Selected[k];
-    }
+    // เก็บค่าติ๊กรายบุคคลแม้ปิดสิทธิ์ทั้งหน่วยชั่วคราว
 
     rows.forEach(x=>{
       if(!(x.employeeCode in state.special328Selected)) state.special328Selected[x.employeeCode]=true;
@@ -3175,6 +3184,7 @@
     const card=$('special328EligibilityCard'), table=$('special328EligibilityTable'), empty=$('special328EligibilityEmpty');
     if (!card || !table || !empty) return;
     const rows=buildSpecial328Eligibility();
+    document.querySelectorAll('[data-special328-unit]').forEach(cb=>{cb.checked=state.special328Units?.[cb.dataset.special328Unit]!==false;});
     card.hidden=!state.special328Dates.length;
     if (!state.special328Dates.length) return;
     if (!unitsReady()) {
@@ -3337,8 +3347,8 @@
   function hrIsDummyHoliday(date,holidaySet) { return hrWeekend(date) || holidaySet.has(date); }
   function hrActualRate() { return HR_MT.baseRate; }
   const HR_DUMMY_BASE_CAPACITY = 6;      // A–F
-  const HR_DUMMY_ACTIVE_CAPACITY = 7;    // A–G ใช้งานปัจจุบัน
-  const HR_DUMMY_DISPLAY_ROWS = 8;        // A–H แสดงในไฟล์ แต่ H สำรองอนาคต
+  const HR_DUMMY_ACTIVE_CAPACITY = 8;    // A–H (G และ H ตามลำดับความสำคัญ)
+  const HR_DUMMY_DISPLAY_ROWS = 8;        // A–H
   function hrSlotTimes(slot) {
     if (slot === 8) return { start:'08:00', end:'16:00', startValue:8/24, endValue:16/24 };
     if (slot === 16) return { start:'16:00', end:'00:00', startValue:16/24, endValue:0 };
@@ -3604,14 +3614,58 @@
           if(cellOcc(cell)>=HR_DUMMY_ACTIVE_CAPACITY) continue;
           const t=choosePerson(cell,300+priority*100+gRound);
           if(!t) continue;
-          add(t,cell,'G');
+          add(t,cell,cellOcc(cell)>=7?'H':'G');
           gProgress=true;
         }
       }
       if(remainingTotal()<=0) break;
     }
 
-    // H จงใจไม่ใช้ในปัจจุบัน
+    // v2.50: สลับคนที่จัดแล้วเข้าเซลล์ว่างก่อนสรุปยอดคงค้าง
+    const slotLimit=c=>overflowPriority(c.date)<99?HR_DUMMY_ACTIVE_CAPACITY:HR_DUMMY_BASE_CAPACITY;
+    const removeRow=r=>{
+      const c=cells.find(c=>c.date===r.date&&c.slot===r.slot);
+      const i=rows.indexOf(r);if(i<0||!c)return false;
+      rows.splice(i,1);c.assigned--;
+      remaining.set(r.employeeCode,(remaining.get(r.employeeCode)||0)+1);
+      assigned.set(r.employeeCode,(assigned.get(r.employeeCode)||0)-1);
+      daySlots(r.employeeCode,r.date).delete(r.slot);
+      if(!daySlots(r.employeeCode,r.date).size)datesForStaff(r.employeeCode).delete(r.date);
+      const ex=existingFor(r.employeeCode);const j=ex.indexOf(r);if(j>=0)ex.splice(j,1);
+      return true;
+    };
+    const eligibleCells=t=>cells.filter(c=>personCanUse(t,c)).sort((a,b)=>{
+      const pa=cellOcc(a)<HR_DUMMY_BASE_CAPACITY?0:overflowPriority(a.date)+1;
+      const pb=cellOcc(b)<HR_DUMMY_BASE_CAPACITY?0:overflowPriority(b.date)+1;
+      return pa-pb||a.date.localeCompare(b.date)||a.slot-b.slot;
+    });
+    let repairBudget=10000;
+    for(const t of [...totals].sort((a,b)=>(remaining.get(b.employeeCode)||0)-(remaining.get(a.employeeCode)||0))){
+      while((remaining.get(t.employeeCode)||0)>0&&repairBudget>0){
+        let fixed=false;
+        for(const c of eligibleCells(t)){
+          if(--repairBudget<=0)break;
+          if(cellOcc(c)<slotLimit(c)){
+            add(t,c,cellOcc(c)>=HR_DUMMY_BASE_CAPACITY?'G-H':'A-F');fixed=true;break;
+          }
+          const victims=rows.filter(r=>r.date===c.date&&r.slot===c.slot&&r.dummyPhase);
+          for(const victim of victims){
+            if(--repairBudget<=0)break;
+            const vt=totals.find(x=>x.employeeCode===victim.employeeCode);
+            if(!vt||!removeRow(victim))continue;
+            const alt=eligibleCells(vt).find(x=>x!==c&&cellOcc(x)<slotLimit(x));
+            if(alt && personCanUse(t,c) && cellOcc(c)<slotLimit(c)){
+              add(vt,alt,cellOcc(alt)>=HR_DUMMY_BASE_CAPACITY?'G-H':'A-F');
+              add(t,c,cellOcc(c)>=HR_DUMMY_BASE_CAPACITY?'G-H':'A-F');
+              fixed=true;break;
+            }
+            add(vt,c,victim.dummyPhase);
+          }
+          if(fixed)break;
+        }
+        if(!fixed)break;
+      }
+    }
     totals.forEach(t=>{
       const claimedUnits=assigned.get(t.employeeCode)||0;
       t.claimedUnits=claimedUnits;
@@ -3634,7 +3688,7 @@
     const dailyCounts=dates.map(date=>{
       const normal=rows.filter(r=>r.date===date).length;
       const special=reservedByDate.get(date)||0;
-      const g=rows.filter(r=>r.date===date&&r.dummyPhase==='G').length;
+      const g=rows.filter(r=>r.date===date&&['G','H','G-H'].includes(r.dummyPhase)).length;
       return {date,normal,special,total:normal+special,g,kind:dayKind(date)};
     });
     const countValues=dailyCounts.map(x=>x.total);
@@ -3820,7 +3874,8 @@
       units:Object.fromEntries(UNITS.map(u=>[u,state.units[u]])),
       calendarSources:state.calendarSources,leaveEvents:state.leaveEvents,
       manualHolidayDates:[...state.manualHolidayDates],labExtraSupport:[...state.labExtraSupport],customStaff:[...state.customStaff],
-      calendarSyncedAt:state.calendarSyncedAt,conflicts:state.conflicts,special328Dates:[...state.special328Dates],special328Selected:{...state.special328Selected},savedAt:state.snapshotAt||now,hrExport:state.hrExport
+      calendarSyncedAt:state.calendarSyncedAt,conflicts:state.conflicts,special328Dates:[...state.special328Dates],special328Selected:{...state.special328Selected},
+      special328Units:{...state.special328Units},savedAt:state.snapshotAt||now,hrExport:state.hrExport
     };
     const {error}=await state.sb.from('ot_batches').upsert({
       cycle_key:cycleKey,cycle_start:state.cycle.start,cycle_end:state.cycle.end,
@@ -3924,7 +3979,8 @@
       calendarSyncedAt:state.calendarSyncedAt, conflicts:state.conflicts,
       manualHolidayDates:[...state.manualHolidayDates],
       labExtraSupport:[...state.labExtraSupport],customStaff:[...state.customStaff],
-      special328Dates:[...state.special328Dates], special328Selected:{...state.special328Selected}, savedAt:now, hrExport:state.hrExport
+      special328Dates:[...state.special328Dates], special328Selected:{...state.special328Selected},
+      special328Units:{...state.special328Units}, savedAt:now, hrExport:state.hrExport
     };
     $('saveBtn').disabled=true;
     try {
@@ -3982,6 +4038,7 @@
     resetLabExtraPicker(true);
     state.special328Dates=cleanSpecial328Dates(p.special328Dates||[]);
     state.special328Selected=(p.special328Selected&&typeof p.special328Selected==='object')?{...p.special328Selected}:{};
+    state.special328Units={LAB:true,Molec:true,Bacteria:true,...(p.special328Units||{})};
     renderRoundHolidaySettings(); renderLabExtraSupport(); renderSpecial328Dates(); renderSpecial328Eligibility();
     setCycleControls({start:state.cycle.start,end:state.cycle.end});
     for(const unit of UNITS) {

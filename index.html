@@ -13,7 +13,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=20261008-v247" />
+  <link rel="stylesheet" href="styles.css?v=20261010-v250" />
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3EOT%3C/text%3E%3C/svg%3E">
   <style>
     /* Critical: author CSS (.center-shell { display:grid }) must not override HTML hidden state */
@@ -299,6 +299,7 @@
                 <div class="section-head compact-section-head">
                   <div><h2>ตรวจสิทธิ์ 00000328</h2></div>
                 </div>
+                <div id="special328UnitChoices" class="special328-unit-choices"><b>คำนวณ 00000328 เพิ่มเฉพาะแผนกที่ยังไม่ได้รวมยอดมา</b><div class="special328-unit-grid"><label><input type="checkbox" data-special328-unit="LAB" checked> LAB คำนวณเพิ่ม</label><label><input type="checkbox" data-special328-unit="Molec" checked> Molec คำนวณเพิ่ม</label><label><input type="checkbox" data-special328-unit="Bacteria" checked> Bacteria คำนวณเพิ่ม</label></div><small>เอาติ๊กออกหากแผนกรวมสิทธิ์มาแล้ว · ปรับรายคนต่อได้ด้านล่าง · กดบันทึกวันที่ 00000328 เพื่อบันทึกตัวเลือก</small></div>
                 <div id="special328EligibilityEmpty" class="empty-state">ยังไม่มีข้อมูล</div>
                 <div class="table-wrap"><table id="special328EligibilityTable"></table></div>
               </section>
@@ -672,7 +673,7 @@
     };
     window.PSC_OT_CONFIG = window.LAB_OT_CONFIG;
   </script>
-  <script src="app.js?v=20261008-48"></script>
+  <script src="app.js?v=20261010-v250"></script>
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(console.warn));
