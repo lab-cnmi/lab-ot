@@ -728,7 +728,7 @@
                   ? `<div class="ack-final-confirm">
                       <b>ตรวจครบแล้วจึงกดรับทราบ</b>
                       <label class="ack-check">
-                        <input type="checkbox" id="ackCheck_${esc(r.cycle_key)}">
+                        <input type="checkbox" data-ack-confirm="${esc(r.cycle_key)}">
                         <span>ข้าพเจ้าได้ตรวจตารางเวรจริง ตารางเบิก HR และวันที่ระบบเว้นแล้ว และรับทราบรายการของตนเอง</span>
                       </label>
                       <button class="primary-btn ack-submit-btn" type="button" data-ack-cycle="${esc(r.cycle_key)}">ยืนยันรับทราบ</button>
@@ -1349,11 +1349,11 @@
     $('staffAckCycleFilter')?.addEventListener('change',e=>{ state.staffAckCycleKey=e.target.value; renderStaffOwnAckFiltered(); });
     $('managerAckList')?.addEventListener('click', e=>{
       const btn=e.target.closest('[data-ack-cycle]');
-      if(btn) acknowledgeOwnCycle(btn.dataset.ackCycle);
+      if(btn) acknowledgeOwnCycle(btn.dataset.ackCycle,btn);
     });
     $('ackList')?.addEventListener('click', e => {
       const btn=e.target.closest('[data-ack-cycle]');
-      if(btn) acknowledgeOwnCycle(btn.dataset.ackCycle);
+      if(btn) acknowledgeOwnCycle(btn.dataset.ackCycle,btn);
     });
     $('logoutBtn').addEventListener('click', logout);
     $('changePasswordBtn')?.addEventListener('click', openPasswordModal);
@@ -2300,22 +2300,71 @@
     renderStaffOwnAckFiltered();
   }
 
-  async function acknowledgeOwnCycle(cycleKey) {
-    const check=$(`ackCheck_${cycleKey}`);
-    if(!check?.checked) return toast('กรุณาติ๊กยืนยันว่าตรวจสอบรายการแล้ว');
-    const btn=document.querySelector(`[data-ack-cycle="${CSS.escape(cycleKey)}"]`);
-    if(btn){btn.disabled=true;btn.textContent='กำลังบันทึก…';}
+  function ackErrorMessage(err) {
+    const raw=String(err?.message||err?.details||err?.hint||err||'').trim();
+    const msg=raw.toLowerCase();
+    if(msg.includes('jwt')||msg.includes('session')||msg.includes('not authenticated')) return 'เซสชันหมดอายุ กรุณาออกจากระบบแล้วเข้าใหม่';
+    if(msg.includes('permission')||msg.includes('policy')||msg.includes('rls')||msg.includes('not authorized')||msg.includes('403')) return 'บัญชีนี้ไม่มีสิทธิ์ยืนยันรายการ OT รอบนี้';
+    if(msg.includes('not found')||msg.includes('no rows')||msg.includes('0 rows')) return 'ไม่พบรายการ OT รอบนี้ของบัญชีที่กำลังใช้งาน';
+    if(msg.includes('network')||msg.includes('fetch')||msg.includes('timeout')) return 'เชื่อมต่อฐานข้อมูลไม่ได้ กรุณาตรวจอินเทอร์เน็ตแล้วลองใหม่';
+    return raw ? `ฐานข้อมูลแจ้งว่า: ${raw}` : 'เกิดข้อผิดพลาดที่ไม่ทราบสาเหตุ';
+  }
+
+  async function acknowledgeOwnCycle(cycleKey, clickedBtn=null) {
+    // v2.53: read the checkbox inside the exact card whose button was clicked.
+    // v2.52 used a repeated DOM id per cycle, so another card could be read instead.
+    const card=clickedBtn?.closest('.ack-person-card');
+    const check=card?.querySelector(`input[data-ack-confirm="${CSS.escape(cycleKey)}"]`)
+      || document.querySelector(`input[data-ack-confirm="${CSS.escape(cycleKey)}"]`);
+    if(!check) return toast('ไม่พบช่องยืนยันของรายการนี้ กรุณารีเฟรชหน้าแล้วลองใหม่');
+    if(!check.checked) return toast('กรุณาติ๊กยืนยันว่าตรวจสอบรายการแล้ว');
+    if(state.offline || !state.sb) return toast('ยังเชื่อมต่อฐานข้อมูลไม่ได้ กรุณาตรวจอินเทอร์เน็ต');
+
+    const email=String(state.session?.user?.email||'').trim().toLowerCase();
+    if(!email) return toast('ไม่พบบัญชีผู้ใช้งาน กรุณาออกจากระบบแล้วเข้าใหม่');
+
+    const buttons=[...document.querySelectorAll(`[data-ack-cycle="${CSS.escape(cycleKey)}"]`)];
+    buttons.forEach(b=>{b.disabled=true;b.textContent='กำลังบันทึก…';});
+
     try{
+      // Check current state first so repeated taps / duplicated requests are idempotent.
+      const {data:current,error:readError}=await state.sb.from('ot_acknowledgements')
+        .select('cycle_key,email,status,acknowledged_at,acknowledged_by')
+        .eq('cycle_key',cycleKey).eq('email',email).maybeSingle();
+      if(readError) throw readError;
+      if(!current){
+        throw new Error('ไม่พบรายการ OT รอบนี้ของบัญชีที่กำลังใช้งาน');
+      }
+      if(current.status==='acknowledged'){
+        toast(`รายการนี้รับทราบแล้ว${current.acknowledged_at?` เมื่อ ${fmtDateTimeThai(current.acknowledged_at)}`:''}`);
+        if(state.viewRole==='staff') await loadAckPortal();
+        else await Promise.all([loadManagerOwnAck(),loadAckManagerData()]);
+        return;
+      }
+      if(current.status!=='pending'){
+        throw new Error(current.status==='unassigned'
+          ? 'รายการนี้ยังไม่ได้ผูก Mahidol ID จึงยังรับทราบไม่ได้'
+          : `สถานะรายการนี้คือ ${current.status||'ไม่ทราบสถานะ'} จึงยังรับทราบไม่ได้`);
+      }
+
       const {data,error}=await state.sb.rpc('acknowledge_ot',{p_cycle_key:cycleKey});
       if(error) throw error;
+
+      // Verify that the persisted state really changed before reporting success.
+      const {data:saved,error:verifyError}=await state.sb.from('ot_acknowledgements')
+        .select('status,acknowledged_at,acknowledged_by')
+        .eq('cycle_key',cycleKey).eq('email',email).maybeSingle();
+      if(verifyError) throw verifyError;
+      if(saved?.status!=='acknowledged') throw new Error('ฐานข้อมูลยังไม่ยืนยันสถานะรับทราบ กรุณาลองใหม่อีกครั้ง');
+
       toast('บันทึกรับทราบเรียบร้อยแล้ว');
       await writeAppLog('ack_ot','รับทราบ OT',`รอบ ${cycleKey}`,'',cycleKey);
       if(state.viewRole==='staff') await loadAckPortal();
       else await Promise.all([loadManagerOwnAck(),loadAckManagerData()]);
     }catch(err){
       console.error('acknowledge OT',err);
-      toast(`บันทึกรับทราบไม่สำเร็จ: ${err.message||err}`);
-      if(btn){btn.disabled=false;btn.textContent='ยืนยันรับทราบ';}
+      toast(`บันทึกรับทราบไม่สำเร็จ: ${ackErrorMessage(err)}`);
+      buttons.forEach(b=>{b.disabled=false;b.textContent='ยืนยันรับทราบ';});
     }
   }
 
